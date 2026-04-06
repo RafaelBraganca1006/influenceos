@@ -32,14 +32,14 @@ function AccountSection({ platforms, accounts, onChange }) {
           <div style={{ fontSize: 13, fontWeight: 600, marginBottom: 12, color: 'var(--text)' }}>
             {PLATFORM_LABELS[p] || p}
           </div>
-          <div className="form-row" style={{ marginBottom: 0 }}>
+          <div className="form-row">
             <div className="form-group">
-              <label className="form-label">Username / Email</label>
+              <label className="form-label">Username</label>
               <input
                 className="form-input"
                 value={get(p, 'username')}
                 onChange={e => update(p, 'username', e.target.value)}
-                placeholder="@username or email"
+                placeholder="@username"
               />
             </div>
             <div className="form-group">
@@ -75,6 +75,7 @@ function AccountSection({ platforms, accounts, onChange }) {
     </div>
   )
 }
+
 
 // ── Pipeline Modal ────────────────────────────────────────────────────────────
 function PipelineModal({ onSave, onClose }) {
@@ -224,10 +225,10 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
   const [saved, setSaved]       = useState(true)
   const [saving, setSaving]     = useState(false)
   const [form, setForm]         = useState({})
-  const [pipelines, setPipelines] = useState([])
-  const [accounts, setAccounts]   = useState([])
-  const [workflows, setWorkflows] = useState([])
-  const [images, setImages]       = useState([])
+  const [pipelines, setPipelines]   = useState([])
+  const [accounts, setAccounts]     = useState([])
+  const [workflows, setWorkflows]   = useState([])
+  const [images, setImages]         = useState([])
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -244,9 +245,9 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
           freqTt:      data.freqTt      || '',
           freqYt:      data.freqYt      || '',
         })
-        setPipelines(data.pipelines || [])
-        setAccounts(data.accounts   || [])
-        setImages(data.refImages    || [])
+        setPipelines(data.pipelines  || [])
+        setAccounts(data.accounts    || [])
+        setImages(data.refImages     || [])
       }
       setLoading(false)
     })
