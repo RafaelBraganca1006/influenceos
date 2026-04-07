@@ -1,4 +1,5 @@
 import { supabase } from './supabase'
+import { uploadImage } from './storage'
 
 // ── DB ↔ JS mappers ───────────────────────────────────────────────────────────
 function fromDb(row) {
@@ -141,5 +142,13 @@ export const Store = {
       img.onerror = reject
       img.src = url
     })
+  },
+
+  // Resize a file and upload to Supabase Storage; returns the public URL.
+  async uploadRefImage(file, influencerId) {
+    const base64 = await this.resizeToBase64(file)
+    const { data: { user } } = await supabase.auth.getUser()
+    const path = `${user.id}/${influencerId}/${Date.now()}`
+    return uploadImage(base64, 'influencer-refs', path)
   },
 }

@@ -1,6 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Store } from '../store'
 import { supabase } from '../supabase'
+import { uploadImage } from '../storage'
 import { ideateCarousel, generateSlidePrompts, generateTopicList, generateSlideImage, buildIdeationPrompt, buildSlidePromptsPrompt, buildTopicListPrompt } from '../services/generator'
 
 // ── Supabase mappers ──────────────────────────────────────────────────────────
@@ -805,6 +806,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const staggerRef  = useRef(null)
   const timerRef    = useRef(null)
   const cancelRef   = useRef(false)
+  const execKeyRef  = useRef(null)   // folder key for current execution's Storage files
 
   function startTimer() {
     setElapsed(0); setTimerActive(true)
@@ -887,9 +889,14 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     setSlideImages(initial)
     const final = [...initial]
 
+    // Generate a unique folder key for this execution's Storage files
+    const { data: { user } } = await supabase.auth.getUser()
+    const execKey = genId()
+    execKeyRef.current = execKey
+    const storageFolder = `${user.id}/${pip.id}/${execKey}`
+
     for (const slide of slides) {
       if (cancelRef.current) {
-        // mark remaining as cancelled
         for (let i = final.findIndex(img => img.position === slide.position); i < final.length; i++) {
           final[i] = { ...final[i], status: 'idle' }
         }
@@ -898,7 +905,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
       }
       const idx = final.findIndex(img => img.position === slide.position)
       try {
-        const src = await generateSlideImage(geminiKey, slide.prompt, refImages, aspectRatio)
+        const base64 = await generateSlideImage(geminiKey, slide.prompt, refImages, aspectRatio)
+        const src = await uploadImage(base64, 'carousel-images', `${storageFolder}/slide-${slide.position}`)
         final[idx] = { ...final[idx], src, status: 'done' }
       } catch (err) {
         final[idx] = { ...final[idx], status: 'error', error: err.message }
@@ -934,7 +942,11 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
       img.position === slide.position ? { ...img, status: 'loading', error: null } : img
     ))
     try {
-      const src = await generateSlideImage(geminiKey, slide.prompt, refImages, aspectRatio)
+      const base64 = await generateSlideImage(geminiKey, slide.prompt, refImages, aspectRatio)
+      // Upload — reuse the same execKey so it overwrites the existing file
+      const { data: { user } } = await supabase.auth.getUser()
+      const execKey = execKeyRef.current || genId()
+      const src = await uploadImage(base64, 'carousel-images', `${user.id}/${pip.id}/${execKey}/slide-${slide.position}`)
       setSlideImages(prev => prev.map(img =>
         img.position === slide.position ? { ...img, src, status: 'done' } : img
       ))

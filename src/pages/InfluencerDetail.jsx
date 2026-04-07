@@ -292,7 +292,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
   async function handleImageUpload(files) {
     const newImgs = []
     for (const f of Array.from(files)) {
-      try { newImgs.push(await Store.resizeToBase64(f)) } catch {}
+      try { newImgs.push(await Store.uploadRefImage(f, id)) } catch {}
     }
     const next = [...images, ...newImgs]
     setImages(next)
