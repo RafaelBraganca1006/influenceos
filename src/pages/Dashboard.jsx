@@ -37,27 +37,38 @@ function EmptyState({ title, sub }) {
 }
 
 export default function Dashboard({ onOpenDetail }) {
-  const [influencers, setInfluencers]       = useState([])
-  const [workflowCounts, setWorkflowCounts] = useState({})
+  const [influencers, setInfluencers]           = useState([])
+  const [workflowCounts, setWorkflowCounts]     = useState({})
+  const [carouselPipCounts, setCarouselPipCounts] = useState({})
+  const [executionCounts, setExecutionCounts]   = useState({})
 
   useEffect(() => {
     Promise.all([
       Store.getAll(),
       supabase.from('workflows').select('influencer_id'),
-    ]).then(([infs, { data: wfRows }]) => {
+      supabase.from('carousel_pipelines').select('influencer_id'),
+      supabase.from('carousel_executions').select('influencer_id').eq('posted', true),
+    ]).then(([infs, { data: wfRows }, { data: cpRows }, { data: exRows }]) => {
       setInfluencers(infs)
-      const counts = {}
-      for (const { influencer_id } of wfRows || []) {
-        counts[influencer_id] = (counts[influencer_id] || 0) + 1
-      }
-      setWorkflowCounts(counts)
+      const wfC = {}, cpC = {}, exC = {}
+      for (const { influencer_id } of wfRows || [])
+        wfC[influencer_id] = (wfC[influencer_id] || 0) + 1
+      for (const { influencer_id } of cpRows || [])
+        cpC[influencer_id] = (cpC[influencer_id] || 0) + 1
+      for (const { influencer_id } of exRows || [])
+        exC[influencer_id] = (exC[influencer_id] || 0) + 1
+      setWorkflowCounts(wfC)
+      setCarouselPipCounts(cpC)
+      setExecutionCounts(exC)
     })
   }, [])
 
-  const active    = influencers.filter(i => i.status === 'active').length
-  const totalPosts = influencers.reduce((s, i) => s + (i.postsGenerated || 0), 0)
-  const totalPips  = Object.values(workflowCounts).reduce((s, n) => s + n, 0)
-  const platforms  = new Set(influencers.flatMap(i => i.platforms || []))
+  const active          = influencers.filter(i => i.status === 'active').length
+  const totalN8nPosts   = influencers.reduce((s, i) => s + (i.postsGenerated || 0), 0)
+  const totalOsPosts    = Object.values(executionCounts).reduce((s, n) => s + n, 0)
+  const totalPips       = influencers.reduce((s, i) =>
+    s + (workflowCounts[i.id] || 0) + (carouselPipCounts[i.id] || 0), 0)
+  const platforms       = new Set(influencers.flatMap(i => i.platforms || []))
 
   return (
     <>
@@ -68,19 +79,19 @@ export default function Dashboard({ onOpenDetail }) {
           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><circle cx="9" cy="7" r="4"/><path d="M3 21v-2a4 4 0 0 1 4-4h4"/><path d="M16 11l2 2 4-4"/></svg>}
         />
         <MetricCard
-          label="Posts Generated" value={totalPosts} sub="All time"
+          label="Posts via n8n" value={totalN8nPosts} sub="From Instagram analytics"
           iconClass="green"
           icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>}
         />
         <MetricCard
-          label="Active Pipelines" value={totalPips} sub="Across all influencers"
-          iconClass="orange"
-          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4M12 17v4"/></svg>}
+          label="Posts via InfluenceOS" value={totalOsPosts} sub="Posted from platform"
+          iconClass="green"
+          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/></svg>}
         />
         <MetricCard
-          label="Platforms" value={platforms.size} sub="Connected channels"
-          iconClass="purple"
-          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>}
+          label="Total Pipelines" value={totalPips} sub="Workflows + carousels"
+          iconClass="orange"
+          icon={<svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="m8 21 4-4 4 4M12 17v4"/></svg>}
         />
       </div>
 
@@ -123,8 +134,8 @@ export default function Dashboard({ onOpenDetail }) {
                     </td>
                     <td style={{ color: 'var(--text-muted)', fontSize: 12 }}>{inf.niche || '—'}</td>
                     <td><PlatIcons platforms={inf.platforms} /></td>
-                    <td style={{ fontSize: 13 }}>{workflowCounts[inf.id] || 0}</td>
-                    <td style={{ fontWeight: 700 }}>{inf.postsGenerated || 0}</td>
+                    <td style={{ fontSize: 13 }}>{(workflowCounts[inf.id] || 0) + (carouselPipCounts[inf.id] || 0)}</td>
+                    <td style={{ fontWeight: 700 }}>{(inf.postsGenerated || 0) + (executionCounts[inf.id] || 0)}</td>
                     <td><span className={`badge ${inf.status}`}>{inf.status}</span></td>
                     <td>
                       <button className="btn btn-sm btn-secondary" onClick={() => onOpenDetail(inf.id)}>Open</button>

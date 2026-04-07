@@ -88,7 +88,7 @@ async function executeNode(node, results, apiKeys) {
     return await callGeminiText(apiKeys.geminiKey, model, resolvedSystem, resolvedPrompt)
   }
   if (node.type === 'image_gen') {
-    const { model = 'gemini-2.0-flash-preview-image-generation', prompt = '', aspectRatio = '9:16' } = node.data.config || {}
+    const { model = 'gemini-3.1-flash-image-preview', prompt = '', aspectRatio = '9:16' } = node.data.config || {}
     const resolvedPrompt = resolveTemplate(prompt, results)
     return await callGeminiImage(apiKeys.geminiKey, model, resolvedPrompt, { aspectRatio })
   }
@@ -97,8 +97,12 @@ async function executeNode(node, results, apiKeys) {
 
 // ── Main executor ─────────────────────────────────────────────────────────────
 export async function executeWorkflow(nodes, edges, apiKeys, onNodeUpdate) {
-  if (!apiKeys.geminiKey) {
+  const key = apiKeys.geminiKey
+  if (!key) {
     throw new Error('Gemini API key not set. Go to Settings to add it.')
+  }
+  if (!key.startsWith('AIza')) {
+    throw new Error('Invalid Gemini API key format. Go to Settings and enter the key from aistudio.google.com (starts with AIza…).')
   }
   const order = topoSort(nodes, edges)
   const results = {}

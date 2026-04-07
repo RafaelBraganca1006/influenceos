@@ -25,15 +25,21 @@ function calcER(profile, media) {
 }
 
 // ── Donut ─────────────────────────────────────────────────────────────────────
+const DONUT_COLORS = {
+  active: '#1d1d1f',
+  paused: '#aeaeb2',
+  draft:  '#e5e5ea',
+}
+
 function renderDonutSegments(influencers) {
   const total    = influencers.length || 1
   const active   = influencers.filter(i => i.status === 'active').length
   const paused   = influencers.filter(i => i.status === 'paused').length
   const draft    = influencers.length - active - paused
   const segments = [
-    { val: active, color: '#0055b3' },
-    { val: paused, color: '#3395f5' },
-    { val: draft,  color: '#a8d4ff' },
+    { val: active, color: DONUT_COLORS.active },
+    { val: paused, color: DONUT_COLORS.paused },
+    { val: draft,  color: DONUT_COLORS.draft  },
   ]
   const r = 15.9155, circ = 100
   let offset = 25
@@ -52,7 +58,7 @@ function renderDonutSegments(influencers) {
 }
 
 // ── Sparkline ─────────────────────────────────────────────────────────────────
-function Sparkline({ values, color = 'var(--accent)', width = 220, height = 36 }) {
+function Sparkline({ values, width = 220, height = 36 }) {
   if (!values || values.length < 2) return null
   const max = Math.max(...values, 1)
   const pad = 2
@@ -63,7 +69,7 @@ function Sparkline({ values, color = 'var(--accent)', width = 220, height = 36 }
   }).join(' ')
   return (
     <svg width={width} height={height} viewBox={`0 0 ${width} ${height}`} style={{ display: 'block', overflow: 'visible' }}>
-      <polyline fill="none" stroke={color} strokeWidth="1.8"
+      <polyline fill="none" stroke="var(--text)" strokeWidth="1.5" strokeOpacity="0.5"
         strokeLinecap="round" strokeLinejoin="round" points={pts}
       />
     </svg>
@@ -91,9 +97,8 @@ function IgSummaryRow({ igInfluencers, igData }) {
       label: 'Total Reach',
       value: fmt(totalReach),
       sub: `${loaded.length} account${loaded.length !== 1 ? 's' : ''}`,
-      color: 'var(--accent)',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/>
           <circle cx="9" cy="7" r="4"/>
           <path d="M23 21v-2a4 4 0 0 0-3-3.87"/>
@@ -105,9 +110,8 @@ function IgSummaryRow({ igInfluencers, igData }) {
       label: 'Best Engagement',
       value: best.er.toFixed(2) + '%',
       sub: best.name,
-      color: '#16a34a',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polyline points="23 6 13.5 15.5 8.5 10.5 1 18"/>
           <polyline points="17 6 23 6 23 12"/>
         </svg>
@@ -117,9 +121,8 @@ function IgSummaryRow({ igInfluencers, igData }) {
       label: 'Top Post',
       value: fmt(topPost.like_count) + ' likes',
       sub: topPost.infName,
-      color: '#d97706',
       icon: (
-        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
           <polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>
         </svg>
       ),
@@ -128,22 +131,24 @@ function IgSummaryRow({ igInfluencers, igData }) {
 
   return (
     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: 12, marginBottom: 24 }}>
-      {items.map(({ label, value, sub, color, icon }) => (
+      {items.map(({ label, value, sub, icon }) => (
         <div key={label} style={{
           background: 'var(--surface2)', borderRadius: 12, padding: '16px 20px',
           display: 'flex', alignItems: 'center', gap: 14,
         }}>
           <div style={{
-            width: 40, height: 40, borderRadius: 10,
-            background: color + '1a', color, display: 'flex', alignItems: 'center', justifyContent: 'center',
+            width: 36, height: 36, borderRadius: 9,
+            background: 'var(--surface)', border: '1px solid var(--border)',
+            color: 'var(--text-mid)',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
             flexShrink: 0,
           }}>
             {icon}
           </div>
           <div>
-            <div style={{ fontSize: 20, fontWeight: 800, color, lineHeight: 1 }}>{value}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.04em' }}>{label}</div>
-            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{sub}</div>
+            <div style={{ fontSize: 20, fontWeight: 700, color: 'var(--text)', lineHeight: 1, letterSpacing: '-0.5px' }}>{value}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', fontWeight: 500, marginTop: 3 }}>{label}</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{sub}</div>
           </div>
         </div>
       ))}
@@ -160,7 +165,7 @@ function IgComparisonChart({ igInfluencers, igData }) {
 
   return (
     <div style={{ marginBottom: 28 }}>
-      <div style={{ fontSize: 11, fontWeight: 700, color: 'var(--text-muted)', marginBottom: 12, textTransform: 'uppercase', letterSpacing: '0.06em' }}>
+      <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', marginBottom: 12, letterSpacing: '0.06em', textTransform: 'uppercase' }}>
         Audience Comparison
       </div>
       <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
@@ -168,24 +173,24 @@ function IgComparisonChart({ igInfluencers, igData }) {
           const d   = igData[inf.id]
           const pct = (d.profile.followers_count / maxFollowers) * 100
           const er  = calcER(d.profile, d.media)
-          const erColor = er >= 3 ? '#16a34a' : er >= 1 ? '#d97706' : '#dc2626'
 
           return (
             <div key={inf.id} style={{ display: 'flex', alignItems: 'center', gap: 12 }}>
               <div style={{ width: 100, fontSize: 12, fontWeight: 600, color: 'var(--text)', flexShrink: 0, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
                 {inf.name}
               </div>
-              <div style={{ flex: 1, height: 10, background: 'var(--surface2)', borderRadius: 99, overflow: 'hidden' }}>
+              <div style={{ flex: 1, height: 6, background: 'var(--surface2)', borderRadius: 99, overflow: 'hidden' }}>
                 <div style={{
                   height: '100%', width: pct + '%',
-                  background: inf.color || 'var(--accent)',
+                  background: 'var(--text)',
                   borderRadius: 99, transition: 'width 0.6s ease',
+                  opacity: 0.75,
                 }} />
               </div>
-              <div style={{ width: 56, fontSize: 12, fontWeight: 700, color: 'var(--text)', textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ width: 56, fontSize: 12, fontWeight: 600, color: 'var(--text)', textAlign: 'right', flexShrink: 0 }}>
                 {fmt(d.profile.followers_count)}
               </div>
-              <div style={{ width: 52, fontSize: 11, fontWeight: 700, color: erColor, textAlign: 'right', flexShrink: 0 }}>
+              <div style={{ width: 56, fontSize: 11, color: 'var(--text-muted)', textAlign: 'right', flexShrink: 0 }}>
                 {er.toFixed(1)}% ER
               </div>
             </div>
@@ -206,7 +211,8 @@ function PostThumbnail({ post, isTop }) {
       style={{
         position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden',
         background: 'var(--surface2)', cursor: 'pointer',
-        boxShadow: isTop ? '0 0 0 2px #d97706' : 'none',
+        outline: isTop ? '2px solid var(--text)' : 'none',
+        outlineOffset: isTop ? '1px' : '0',
       }}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
@@ -219,31 +225,31 @@ function PostThumbnail({ post, isTop }) {
       {isTop && (
         <div style={{
           position: 'absolute', top: 5, left: 5,
-          background: '#d97706', borderRadius: 4,
-          padding: '2px 5px', fontSize: 9, fontWeight: 800,
-          color: 'white', letterSpacing: '0.04em',
+          background: 'var(--text)', borderRadius: 4,
+          padding: '2px 5px', fontSize: 9, fontWeight: 700,
+          color: 'white', letterSpacing: '0.06em',
         }}>
           TOP
         </div>
       )}
 
       {post.media_type === 'VIDEO' && (
-        <div style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(0,0,0,0.5)', borderRadius: 4, padding: '2px 5px' }}>
+        <div style={{ position: 'absolute', top: 5, right: 5, background: 'rgba(0,0,0,0.45)', borderRadius: 4, padding: '2px 5px' }}>
           <svg width="9" height="9" viewBox="0 0 24 24" fill="white"><polygon points="5 3 19 12 5 21 5 3"/></svg>
         </div>
       )}
 
       {hover && (
         <div style={{
-          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.6)',
+          position: 'absolute', inset: 0, background: 'rgba(0,0,0,0.55)',
           display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 12,
           borderRadius: 8,
         }}>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'white', fontSize: 11, fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'white', fontSize: 11, fontWeight: 600 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="white"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
             {fmt(post.like_count)}
           </div>
-          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'white', fontSize: 11, fontWeight: 700 }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 4, color: 'white', fontSize: 11, fontWeight: 600 }}>
             <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
             {fmt(post.comments_count)}
           </div>
@@ -253,19 +259,20 @@ function PostThumbnail({ post, isTop }) {
   )
 }
 
-// ── IG Influencer Card ────────────────────────────────────────────────────────
-function StatPill({ label, value, color = 'var(--accent)' }) {
+// ── Stat Pill ─────────────────────────────────────────────────────────────────
+function StatPill({ label, value }) {
   return (
     <div style={{
       display: 'flex', flexDirection: 'column', alignItems: 'center',
       background: 'var(--surface2)', borderRadius: 10, padding: '10px 16px', minWidth: 72,
     }}>
-      <span style={{ fontSize: 16, fontWeight: 800, color, lineHeight: 1 }}>{value}</span>
-      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, marginTop: 3, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
+      <span style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1, letterSpacing: '-0.3px' }}>{value}</span>
+      <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, marginTop: 4, textTransform: 'uppercase', letterSpacing: '0.05em' }}>{label}</span>
     </div>
   )
 }
 
+// ── IG Influencer Card ────────────────────────────────────────────────────────
 function IgInfluencerCard({ inf, igData }) {
   const { profile, media } = igData
 
@@ -278,7 +285,6 @@ function IgInfluencerCard({ inf, igData }) {
   const photoCount  = media.filter(p => p.media_type === 'IMAGE').length
   const videoCount  = media.filter(p => p.media_type === 'VIDEO').length
 
-  // Sparkline: reverse to oldest→newest, likes trend
   const sparkValues = [...media].reverse().map(p => p.like_count)
 
   return (
@@ -286,19 +292,19 @@ function IgInfluencerCard({ inf, igData }) {
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'center', gap: 14, marginBottom: 16, flexWrap: 'wrap' }}>
         <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-          <div className="avatar" style={{ background: inf.color, width: 42, height: 42, fontSize: 16, flexShrink: 0 }}>
+          <div className="avatar" style={{ background: inf.color, width: 40, height: 40, fontSize: 15, flexShrink: 0, borderRadius: 10 }}>
             {profile.profile_pic_url
-              ? <img src={proxyImg(profile.profile_pic_url)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} alt="" />
+              ? <img src={proxyImg(profile.profile_pic_url)} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} alt="" />
               : inf.refImages?.[0]
-                ? <img src={inf.refImages[0]} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} alt="" />
+                ? <img src={inf.refImages[0]} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 10 }} alt="" />
                 : inf.name[0].toUpperCase()
             }
           </div>
           <div>
-            <div style={{ fontWeight: 700, fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
+            <div style={{ fontWeight: 600, fontSize: 14, color: 'var(--text)', display: 'flex', alignItems: 'center', gap: 5 }}>
               {inf.name}
               {profile.is_verified && (
-                <svg width="13" height="13" viewBox="0 0 24 24" fill="#0071e3">
+                <svg width="13" height="13" viewBox="0 0 24 24" fill="var(--accent)">
                   <path d="M9 12l2 2 4-4m6 2a9 9 0 1 1-18 0 9 9 0 0 1 18 0z"/>
                 </svg>
               )}
@@ -307,13 +313,13 @@ function IgInfluencerCard({ inf, igData }) {
           </div>
         </div>
 
-        <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginLeft: 'auto' }}>
+        <div style={{ display: 'flex', gap: 6, flexWrap: 'wrap', marginLeft: 'auto' }}>
           <StatPill label="Followers"    value={fmt(profile.followers_count)} />
           <StatPill label="Following"    value={fmt(profile.following_count)} />
           <StatPill label="Posts"        value={fmt(profile.media_count)} />
           <StatPill label="Avg Likes"    value={fmt(Math.round(avgLikes))} />
           <StatPill label="Avg Comments" value={fmt(Math.round(avgComments))} />
-          <StatPill label="Engagement"   value={erStr} color="#16a34a" />
+          <StatPill label="Engagement"   value={erStr} />
         </div>
       </div>
 
@@ -326,7 +332,6 @@ function IgInfluencerCard({ inf, igData }) {
             ))}
           </div>
 
-          {/* Footer: media breakdown + sparkline */}
           <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginTop: 12, flexWrap: 'wrap', gap: 10 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               {photoCount > 0 && (
@@ -345,7 +350,7 @@ function IgInfluencerCard({ inf, igData }) {
                   {videoCount} video{videoCount !== 1 ? 's' : ''}
                 </span>
               )}
-              <span style={{ fontSize: 11, color: 'var(--text-muted)', marginLeft: 4 }}>
+              <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
                 (last {media.length} posts)
               </span>
             </div>
@@ -354,7 +359,7 @@ function IgInfluencerCard({ inf, igData }) {
               <span style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Likes trend
               </span>
-              <Sparkline values={sparkValues} color={inf.color || 'var(--accent)'} />
+              <Sparkline values={sparkValues} />
             </div>
           </div>
         </>
@@ -408,7 +413,12 @@ function IgAnalyticsSection({ influencers }) {
     igInfluencers.forEach(inf => {
       const username = inf.accounts.find(a => a.platform === 'ig').username
       fetchInstagramData(username, apiKey)
-        .then(data => setIgData(prev => ({ ...prev, [inf.id]: data })))
+        .then(data => {
+          setIgData(prev => ({ ...prev, [inf.id]: data }))
+          if (data?.profile?.media_count != null) {
+            Store.update(inf.id, { postsGenerated: data.profile.media_count })
+          }
+        })
         .catch(err  => setIgData(prev => ({ ...prev, [inf.id]: { error: err.message } })))
     })
   }, [apiKey, influencers.map(i => i.id).join(',')])
@@ -467,7 +477,7 @@ function IgAnalyticsSection({ influencers }) {
                     {inf.name[0].toUpperCase()}
                   </div>
                   <span style={{ fontWeight: 600, fontSize: 13 }}>{inf.name}</span>
-                  <span style={{ fontSize: 12, color: 'var(--red, #dc2626)' }}>
+                  <span style={{ fontSize: 12, color: 'var(--red)' }}>
                     {d.error.includes('401') || d.error.includes('403')
                       ? 'Invalid API key — check your RapidAPI key'
                       : `API error: ${d.error}`}
@@ -481,6 +491,52 @@ function IgAnalyticsSection({ influencers }) {
             })}
           </>
         )}
+      </div>
+    </div>
+  )
+}
+
+// ── Bar Chart ─────────────────────────────────────────────────────────────────
+function BarChart({ influencers }) {
+  const values = influencers.map(inf => Math.max(inf.postsGenerated || 0, 0))
+  const max    = Math.max(...values, 1)
+
+  return (
+    <div style={{ marginTop: 16 }}>
+      {/* Grid lines */}
+      <div style={{ position: 'relative', height: 120 }}>
+        {[0.25, 0.5, 0.75, 1].map(t => (
+          <div key={t} style={{
+            position: 'absolute', bottom: `${t * 100}%`, left: 0, right: 0,
+            borderTop: '1px solid var(--border)',
+          }} />
+        ))}
+        {/* Bars */}
+        <div style={{ display: 'flex', alignItems: 'flex-end', gap: 8, height: '100%', padding: '0 2px', position: 'relative', zIndex: 1 }}>
+          {influencers.map((inf, idx) => {
+            const h = max > 0 ? (values[idx] / max) * 100 : 8
+            return (
+              <div key={inf.id} style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 0 }}>
+                <div style={{
+                  width: '100%', maxWidth: 36,
+                  height: `${Math.max(h, 5)}%`,
+                  background: 'var(--text)',
+                  opacity: inf.status === 'active' ? 0.8 : 0.15,
+                  borderRadius: '4px 4px 0 0',
+                  transition: 'opacity 0.15s',
+                }} />
+              </div>
+            )
+          })}
+        </div>
+      </div>
+      {/* Labels */}
+      <div style={{ display: 'flex', gap: 8, padding: '6px 2px 0' }}>
+        {influencers.map(inf => (
+          <div key={inf.id} style={{ flex: 1, textAlign: 'center', fontSize: 10, color: 'var(--text-muted)', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {inf.name.split(' ')[0].slice(0, 7)}
+          </div>
+        ))}
       </div>
     </div>
   )
@@ -540,14 +596,14 @@ export default function Analytics() {
               </div>
               <div className="donut-legend">
                 {[
-                  ['Active', '#0055b3', active],
-                  ['Paused', '#3395f5', paused],
-                  ['Draft',  '#a8d4ff', draft],
+                  ['Active', DONUT_COLORS.active, active],
+                  ['Paused', DONUT_COLORS.paused, paused],
+                  ['Draft',  DONUT_COLORS.draft,  draft],
                 ].map(([label, dotColor, count]) => (
                   <div key={label} className="legend-item">
-                    <div className="legend-dot" style={{ background: dotColor }} />
-                    <span style={{ flex: 1, fontSize: 12 }}>{label}</span>
-                    <span style={{ fontWeight: 700, fontSize: 12 }}>{count}</span>
+                    <div className="legend-dot" style={{ background: dotColor, border: dotColor === DONUT_COLORS.draft ? '1px solid var(--border)' : 'none' }} />
+                    <span style={{ flex: 1, fontSize: 12, color: 'var(--text-mid)' }}>{label}</span>
+                    <span style={{ fontWeight: 600, fontSize: 12, color: 'var(--text)' }}>{count}</span>
                   </div>
                 ))}
               </div>
@@ -559,29 +615,11 @@ export default function Analytics() {
         <div className="card">
           <div className="card-header"><span className="card-title">Posts Generated</span></div>
           <div className="card-body">
-            <div style={{
-              height: 160, borderRadius: 10, background: 'var(--surface2)',
-              display: 'flex', alignItems: 'flex-end', justifyContent: 'center',
-              padding: '16px 12px 12px', marginTop: 12, overflow: 'hidden',
-            }}>
-              <div className="chart-bars" style={{ width: '100%', justifyContent: 'center' }}>
-                {influencers.map((inf, idx) => {
-                  const h = Math.max(16, (inf.postsGenerated || 0) * 10 + 20)
-                  return (
-                    <div key={inf.id} style={{ display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 6 }}>
-                      <div className="bar" style={{ height: Math.min(h, 100), background: inf.color || '#0071e3', width: 28 }} />
-                      <div style={{ fontSize: 10, color: 'var(--text-muted)', fontWeight: 600 }}>
-                        {inf.name.split(' ')[0].slice(0, 6)}
-                      </div>
-                    </div>
-                  )
-                })}
-              </div>
-            </div>
+            <BarChart influencers={influencers} />
           </div>
         </div>
 
-        {/* Instagram Analytics — full width, before Pipeline */}
+        {/* Instagram Analytics — full width */}
         <IgAnalyticsSection influencers={influencers} />
 
         {/* Pipeline Overview */}
@@ -602,13 +640,13 @@ export default function Analytics() {
                     <tr key={wf.id}>
                       <td>
                         <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                          <div className="avatar" style={{ background: inf.color, width: 24, height: 24, fontSize: 10 }}>
+                          <div className="avatar" style={{ background: inf.color, width: 24, height: 24, fontSize: 10, borderRadius: 6 }}>
                             {inf.refImages?.[0]
-                              ? <img src={inf.refImages[0]} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} alt="" />
+                              ? <img src={inf.refImages[0]} style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: 6 }} alt="" />
                               : inf.name[0].toUpperCase()
                             }
                           </div>
-                          {inf.name}
+                          <span style={{ fontWeight: 500 }}>{inf.name}</span>
                         </div>
                       </td>
                       <td style={{ fontWeight: 600 }}>{wf.name}</td>
@@ -621,7 +659,7 @@ export default function Analytics() {
                 })}
                 {workflows.length === 0 && (
                   <tr>
-                    <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: 24 }}>
+                    <td colSpan={4} style={{ textAlign: 'center', color: 'var(--text-muted)', padding: '28px 16px', fontSize: 13 }}>
                       No pipelines yet
                     </td>
                   </tr>

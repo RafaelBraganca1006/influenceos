@@ -8,19 +8,22 @@ import Analytics from './pages/Analytics'
 import Settings from './pages/Settings'
 import InfluencerDetail from './pages/InfluencerDetail'
 import PipelineBuilder from './pages/PipelineBuilder'
+import CarouselPipeline from './pages/CarouselPipeline'
 
 const PAGE_TITLES = {
-  dashboard:   'Dashboard',
-  influencers: 'Virtual Influencers',
-  analytics:   'Analytics',
-  settings:    'Settings',
+  dashboard:          'Dashboard',
+  influencers:        'Virtual Influencers',
+  analytics:          'Analytics',
+  settings:           'Settings',
+  'carousel-pipeline': 'Carousel Pipeline',
 }
 
 export default function App() {
   const [session, setSession] = useState(undefined)
   const [page, setPage]       = useState('dashboard')
   const [detailId, setDetailId] = useState(null)
-  const [pipelineCtx, setPipelineCtx] = useState(null) // { influencerId, workflowId }
+  const [pipelineCtx, setPipelineCtx] = useState(null)   // { influencerId, workflowId }
+  const [carouselInfId, setCarouselInfId] = useState(null)
   const [influencerCount, setInfluencerCount] = useState(0)
 
   useEffect(() => {
@@ -43,6 +46,17 @@ export default function App() {
     else setPage('influencers')
   }
 
+  function openCarouselPipeline(influencerId) {
+    setCarouselInfId(influencerId)
+    setPage('carousel-pipeline')
+  }
+  function closeCarouselPipeline() {
+    const infId = carouselInfId
+    setCarouselInfId(null)
+    if (infId) { setDetailId(infId); setPage('detail') }
+    else setPage('influencers')
+  }
+
   async function handleSignOut() { await supabase.auth.signOut() }
 
   if (session === undefined) {
@@ -54,7 +68,8 @@ export default function App() {
   }
   if (!session) return <Auth />
 
-  const isPipelineBuilder = page === 'pipeline-builder'
+  const isPipelineBuilder  = page === 'pipeline-builder'
+  const isCarouselPipeline = page === 'carousel-pipeline'
   const title = page === 'detail' ? 'Influencer' : PAGE_TITLES[page] || ''
 
   return (
@@ -72,6 +87,12 @@ export default function App() {
               <button className="btn btn-secondary btn-sm" onClick={closeDetail} style={{ gap:5, marginRight:8, flexShrink:0 }}>
                 <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
                 Influencers
+              </button>
+            )}
+            {isCarouselPipeline && (
+              <button className="btn btn-secondary btn-sm" onClick={closeCarouselPipeline} style={{ gap:5, marginRight:8, flexShrink:0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                Back
               </button>
             )}
             <div className="topbar-title">{title}</div>
@@ -93,6 +114,13 @@ export default function App() {
               onBack={closeDetail}
               onOpenPipeline={(wfId) => openPipelineBuilder(detailId, wfId)}
               onNewPipeline={() => openPipelineBuilder(detailId, null)}
+              onNewCarousel={() => openCarouselPipeline(detailId)}
+            />
+          )}
+          {page === 'carousel-pipeline' && carouselInfId && (
+            <CarouselPipeline
+              influencerId={carouselInfId}
+              onBack={closeCarouselPipeline}
             />
           )}
           {page === 'pipeline-builder' && pipelineCtx && (

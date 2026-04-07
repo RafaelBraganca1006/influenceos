@@ -58,7 +58,7 @@ function DotsMenu({ onEdit, onDelete }) {
 }
 
 // ── Card ──────────────────────────────────────────────────────────────────────
-function InfluencerCard({ inf, pipelineCount, onEdit, onDelete, onOpen }) {
+function InfluencerCard({ inf, pipelineCount, postCount, onEdit, onDelete, onOpen }) {
   const image = inf.refImages?.[0]
 
   return (
@@ -129,7 +129,7 @@ function InfluencerCard({ inf, pipelineCount, onEdit, onDelete, onOpen }) {
 
             <div style={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-start', gap: 1 }}>
               <span style={{ fontSize: 15, fontWeight: 800, color: 'white', lineHeight: 1, textShadow: '0 1px 4px rgba(0,0,0,0.5)' }}>
-                {inf.postsGenerated || 0}
+                {postCount}
               </span>
               <span style={{ fontSize: 9, fontWeight: 600, color: 'rgba(255,255,255,0.6)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>
                 Posts
@@ -188,23 +188,34 @@ function AddCard({ onClick }) {
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 export default function Influencers({ onOpenDetail, onCountChange }) {
-  const [influencers, setInfluencers]     = useState([])
+  const [influencers, setInfluencers]       = useState([])
   const [workflowCounts, setWorkflowCounts] = useState({})
-  const [loading, setLoading]             = useState(true)
-  const [modal, setModal]                 = useState(null)
+  const [executionCounts, setExecutionCounts] = useState({})
+  const [loading, setLoading]               = useState(true)
+  const [modal, setModal]                   = useState(null)
 
   async function loadData() {
-    const [infData, wfData] = await Promise.all([
+    const [infData, wfData, cpData, exData] = await Promise.all([
       Store.getAll(),
       supabase.from('workflows').select('influencer_id'),
+      supabase.from('carousel_pipelines').select('influencer_id'),
+      supabase.from('carousel_executions').select('influencer_id').eq('posted', true),
     ])
     setInfluencers(infData)
     onCountChange?.(infData.length)
-    const counts = {}
+    const pipCounts = {}
     for (const { influencer_id } of wfData.data || []) {
-      counts[influencer_id] = (counts[influencer_id] || 0) + 1
+      pipCounts[influencer_id] = (pipCounts[influencer_id] || 0) + 1
     }
-    setWorkflowCounts(counts)
+    for (const { influencer_id } of cpData.data || []) {
+      pipCounts[influencer_id] = (pipCounts[influencer_id] || 0) + 1
+    }
+    setWorkflowCounts(pipCounts)
+    const exCounts = {}
+    for (const { influencer_id } of exData.data || []) {
+      exCounts[influencer_id] = (exCounts[influencer_id] || 0) + 1
+    }
+    setExecutionCounts(exCounts)
     setLoading(false)
   }
 
@@ -254,6 +265,7 @@ export default function Influencers({ onOpenDetail, onCountChange }) {
             key={inf.id}
             inf={inf}
             pipelineCount={workflowCounts[inf.id] || 0}
+            postCount={(inf.postsGenerated || 0) + (executionCounts[inf.id] || 0)}
             onEdit={() => setModal(inf)}
             onDelete={() => handleDelete(inf.id)}
             onOpen={() => onOpenDetail(inf.id)}
