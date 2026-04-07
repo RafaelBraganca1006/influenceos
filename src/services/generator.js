@@ -116,7 +116,7 @@ export async function generateTopicList(apiKey, inf, count = 10, customPrompt) {
 }
 
 // ── Phase 4: Caption + Hashtags ───────────────────────────────────────────────
-export function buildCaptionPrompt(inf, idea, hashtagCount = 20) {
+export function buildCaptionPrompt(inf, idea, hashtagCount = 5) {
   const persona = buildPersonaContext(inf)
   return {
     system: `You are a social media copywriter for this Instagram creator:\n\n${persona}\n\nWrite copy that feels authentic to their voice and resonates with their audience.`,
@@ -124,7 +124,7 @@ export function buildCaptionPrompt(inf, idea, hashtagCount = 20) {
   }
 }
 
-export async function generateCaption(apiKey, inf, idea, hashtagCount = 20, customPrompt) {
+export async function generateCaption(apiKey, inf, idea, hashtagCount = 5, customPrompt) {
   const defaults = buildCaptionPrompt(inf, idea, hashtagCount)
   const system   = customPrompt?.system ?? defaults.system
   const user     = customPrompt?.user   ?? defaults.user

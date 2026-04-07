@@ -231,6 +231,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
   const [images, setImages]         = useState([])
   const [executions, setExecutions]   = useState([])
   const [selectedPost, setSelectedPost] = useState(null)
+  const [activeTab, setActiveTab]   = useState('persona')
   const fileRef = useRef(null)
 
   useEffect(() => {
@@ -326,225 +327,225 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
     )
   }
 
+  const postedCount    = executions.filter(e => e.posted).length
+  const notPostedCount = executions.length - postedCount
+
+  async function togglePosted(exId, current) {
+    const posted = !current
+    setExecutions(prev => prev.map(e => e.id === exId ? { ...e, posted } : e))
+    if (selectedPost?.id === exId) setSelectedPost(s => ({ ...s, posted }))
+    await supabase.from('carousel_executions').update({ posted }).eq('id', exId)
+  }
+
+  const TABS = [
+    { id: 'persona',   label: 'Persona' },
+    { id: 'account',   label: 'Account' },
+    { id: 'images',    label: 'Reference Images' },
+    { id: 'pipelines', label: 'Pipelines' },
+    { id: 'posts',     label: `Posts${executions.length ? ` (${executions.length})` : ''}` },
+  ]
+
   return (
-    <div style={{ display: 'flex', gap: 0, margin: '-28px -32px', minHeight: 'calc(100vh - 58px)' }}>
-      {/* Left sidenav */}
-      <nav className="detail-sidenav">
-        <div className="detail-sidenav-profile">
-          <div className="detail-sidenav-avatar" style={{ background: inf.color }}>
-            {images[0]
-              ? <img src={images[0]} style={{ width:'100%', height:'100%', objectFit:'cover', borderRadius:12 }} alt="" />
-              : inf.name.charAt(0).toUpperCase()
-            }
-          </div>
-          <div className="detail-sidenav-name">{inf.name}</div>
-          <div className="detail-sidenav-niche">{inf.niche || 'No niche set'}</div>
-          <span className={`badge ${inf.status}`} style={{ marginTop: 6 }}>{inf.status}</span>
+    <div style={{ display: 'flex', flexDirection: 'column', margin: '-28px -32px', minHeight: 'calc(100vh - 58px)' }}>
+
+      {/* ── Page header ── */}
+      <div style={{
+        display: 'flex', alignItems: 'center', gap: 14,
+        padding: '18px 32px 0',
+        borderBottom: '1px solid var(--border)',
+        background: 'var(--surface)',
+      }}>
+        {/* Avatar */}
+        <div style={{
+          width: 42, height: 42, borderRadius: 12, background: inf.color,
+          flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center',
+          fontSize: 18, fontWeight: 700, color: 'white', overflow: 'hidden',
+        }}>
+          {images[0]
+            ? <img src={images[0]} style={{ width: '100%', height: '100%', objectFit: 'cover' }} alt="" />
+            : inf.name.charAt(0).toUpperCase()
+          }
         </div>
 
-        <div className="nav-label" style={{ marginTop: 4 }}>Sections</div>
-        {[
-          ['Account',         'section-account',  IconKey],
-          ['Persona Context', 'section-persona',  IconPerson],
-          ['Reference Images','section-images',   IconImage],
-          ['Pipelines',       'section-pipelines',IconPipeline],
-        ].map(([label, sectionId, Icon]) => (
-          <div
-            key={label}
-            className="nav-item"
-            style={{ fontSize: 13 }}
-            onClick={() => document.getElementById(sectionId)?.scrollIntoView({ behavior: 'smooth', block: 'start' })}
+        {/* Name + niche */}
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontSize: 15, fontWeight: 700, color: 'var(--text)', lineHeight: 1.2 }}>{inf.name}</div>
+          <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2 }}>{inf.niche || 'No niche set'}</div>
+        </div>
+
+        {/* Save indicators */}
+        {saved
+          ? <span className="save-indicator show"><svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>Saved</span>
+          : <span style={{ fontSize: 12, color: 'var(--amber)', fontWeight: 500 }}>Unsaved changes</span>
+        }
+        <button className="btn btn-primary btn-sm" onClick={saveAll} disabled={saving}>
+          {saving ? 'Saving…' : 'Save Changes'}
+        </button>
+
+      </div>
+
+      {/* ── Tab bar ── */}
+      <div style={{
+        display: 'flex', gap: 0,
+        padding: '0 32px',
+        background: 'var(--surface)',
+        borderBottom: '1px solid var(--border)',
+      }}>
+        {TABS.map(tab => (
+          <button
+            key={tab.id}
+            onClick={() => { setActiveTab(tab.id); setSelectedPost(null) }}
+            style={{
+              background: 'none', border: 'none', cursor: 'pointer',
+              padding: '10px 16px',
+              fontSize: 13, fontWeight: activeTab === tab.id ? 600 : 400,
+              color: activeTab === tab.id ? 'var(--accent)' : 'var(--text-muted)',
+              borderBottom: activeTab === tab.id ? '2px solid var(--accent)' : '2px solid transparent',
+              marginBottom: -1,
+              transition: 'color 0.15s',
+              whiteSpace: 'nowrap',
+            }}
           >
-            <Icon />{label}
-          </div>
-        ))}
-      </nav>
-
-      {/* Main content */}
-      <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto', background: 'var(--bg)' }}>
-        {/* Save bar */}
-        <div style={{ display:'flex', alignItems:'center', gap:12, marginBottom:24 }}>
-          <span style={{ fontSize:16, fontWeight:700, flex:1 }}>{inf.name}</span>
-          {saved && (
-            <span className="save-indicator show">
-              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-                <polyline points="20 6 9 17 4 12"/>
-              </svg>
-              Saved
-            </span>
-          )}
-          {!saved && <span style={{ fontSize:12, color:'var(--amber)', fontWeight:500 }}>Unsaved changes</span>}
-          <button className="btn btn-primary btn-sm" onClick={saveAll} disabled={saving}>
-            {saving ? 'Saving…' : 'Save Changes'}
+            {tab.label}
           </button>
-        </div>
+        ))}
+      </div>
 
-        {/* Account Credentials */}
-        <Section id="section-account" title="Account" sub="Login credentials for each platform">
-          <AccountSection
-            platforms={inf.platforms}
-            accounts={accounts}
-            onChange={handleAccountsChange}
-          />
-        </Section>
+      {/* ── Tab content ── */}
+      <div style={{ flex: 1, padding: '28px 32px', overflowY: 'auto', background: 'var(--bg)' }}>
 
-        {/* Persona Context */}
-        <Section id="section-persona" title="Persona Context" sub="Define personality, style, and target audience">
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Personality</label>
-              <textarea className="form-textarea" value={form.personality} onChange={e => handleField('personality', e.target.value)} placeholder="Describe the influencer's personality traits..." />
+        {/* Persona */}
+        {activeTab === 'persona' && (
+          <>
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Personality</label>
+                <textarea className="form-textarea" value={form.personality} onChange={e => handleField('personality', e.target.value)} placeholder="Describe the influencer's personality traits..." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Visual Style</label>
+                <textarea className="form-textarea" value={form.visualStyle} onChange={e => handleField('visualStyle', e.target.value)} placeholder="Aesthetic, color palette, lighting preferences..." />
+              </div>
             </div>
-            <div className="form-group">
-              <label className="form-label">Visual Style</label>
-              <textarea className="form-textarea" value={form.visualStyle} onChange={e => handleField('visualStyle', e.target.value)} placeholder="Aesthetic, color palette, lighting preferences..." />
+            <div className="form-row">
+              <div className="form-group">
+                <label className="form-label">Tone of Voice</label>
+                <input className="form-input" value={form.tone} onChange={e => handleField('tone', e.target.value)} placeholder="e.g. Playful and relatable, professional..." />
+              </div>
+              <div className="form-group">
+                <label className="form-label">Target Audience</label>
+                <input className="form-input" value={form.audience} onChange={e => handleField('audience', e.target.value)} placeholder="e.g. Women 18–28, fashion enthusiasts..." />
+              </div>
             </div>
-          </div>
-          <div className="form-row">
-            <div className="form-group">
-              <label className="form-label">Tone of Voice</label>
-              <input className="form-input" value={form.tone} onChange={e => handleField('tone', e.target.value)} placeholder="e.g. Playful and relatable, professional..." />
+            <div className="form-group" style={{ marginBottom: 16 }}>
+              <label className="form-label">Topics to Avoid</label>
+              <input className="form-input" value={form.avoid} onChange={e => handleField('avoid', e.target.value)} placeholder="e.g. Politics, explicit content, competitor brands..." />
             </div>
-            <div className="form-group">
-              <label className="form-label">Target Audience</label>
-              <input className="form-input" value={form.audience} onChange={e => handleField('audience', e.target.value)} placeholder="e.g. Women 18–28, fashion enthusiasts..." />
+            <div>
+              <label className="form-label" style={{ marginBottom: 8, display: 'block' }}>Posting Frequency</label>
+              <div className="freq-row">
+                {[['freqIg','Instagram'],['freqTt','TikTok'],['freqYt','YouTube']].map(([key, label]) => (
+                  <div key={key} className="freq-group">
+                    <label>{label}</label>
+                    <input className="form-input" style={{ width: 70 }} value={form[key] || ''} onChange={e => handleField(key, e.target.value)} placeholder="0" type="number" min="0" />
+                    <span>/ week</span>
+                  </div>
+                ))}
+              </div>
             </div>
-          </div>
-          <div className="form-group" style={{ marginBottom: 16 }}>
-            <label className="form-label">Topics to Avoid</label>
-            <input className="form-input" value={form.avoid} onChange={e => handleField('avoid', e.target.value)} placeholder="e.g. Politics, explicit content, competitor brands..." />
-          </div>
-          <div>
-            <label className="form-label" style={{ marginBottom: 8, display:'block' }}>Posting Frequency</label>
-            <div className="freq-row">
-              {[['freqIg','Instagram'],['freqTt','TikTok'],['freqYt','YouTube']].map(([key,label]) => (
-                <div key={key} className="freq-group">
-                  <label>{label}</label>
-                  <input
-                    className="form-input" style={{ width: 70 }}
-                    value={form[key] || ''}
-                    onChange={e => handleField(key, e.target.value)}
-                    placeholder="0" type="number" min="0"
-                  />
-                  <span>/ week</span>
-                </div>
-              ))}
-            </div>
-          </div>
-        </Section>
+          </>
+        )}
+
+        {/* Account */}
+        {activeTab === 'account' && (
+          <AccountSection platforms={inf.platforms} accounts={accounts} onChange={handleAccountsChange} />
+        )}
 
         {/* Reference Images */}
-        <Section id="section-images" title="Reference Images" sub="Upload photos to define the visual identity">
-          <div className="ref-images-grid">
-            {images.map((src, i) => (
-              <div key={i} className="ref-img-slot">
-                <img src={src} alt="" />
-                <button className="remove-img" onClick={() => removeImage(i)}>✕</button>
-              </div>
-            ))}
-            {images.length < 10 && (
-              <div className="ref-img-slot" onClick={() => fileRef.current?.click()}>
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                  <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-                </svg>
-              </div>
-            )}
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" multiple style={{ display:'none' }} onChange={e => handleImageUpload(e.target.files)} />
-        </Section>
-
-        {/* Pipelines */}
-        <Section id="section-pipelines" title="Pipelines" sub="AI content generation workflows" defaultOpen={true}>
-          {/* Carousel Pipeline quick-access */}
-          <div
-            onClick={() => onNewCarousel?.()}
-            style={{
-              background: 'var(--accent-bg)', border: '1px solid #bfdbfe',
-              borderRadius: 10, padding: '14px 18px', marginBottom: 14,
-              display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
-              transition: 'all 0.12s',
-            }}
-            onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
-            onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-bg)'}
-          >
-            <div style={{
-              width: 34, height: 34, borderRadius: 9, background: 'var(--accent)',
-              display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0,
-            }}>
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
-                <rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/>
-              </svg>
-            </div>
-            <div style={{ flex: 1 }}>
-              <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Carousel Pipeline</div>
-              <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>Generate full AI carousels — idea → prompts → images</div>
-            </div>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5">
-              <polyline points="9 18 15 12 9 6"/>
-            </svg>
-          </div>
-
-          {/* Node-based workflows */}
-          <div className="pipeline-list">
-            {workflows.map(wf => (
-              <div key={wf.id} className="pipeline-item">
-                <div className="pipeline-type-icon video">
-                  <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                    <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
-                    <rect x="3" y="14" width="7" height="7" rx="1"/><line x1="14" y1="17" x2="21" y2="17"/><line x1="17" y1="14" x2="17" y2="21"/>
+        {activeTab === 'images' && (
+          <>
+            <div className="ref-images-grid">
+              {images.map((src, i) => (
+                <div key={i} className="ref-img-slot">
+                  <img src={src} alt="" />
+                  <button className="remove-img" onClick={() => removeImage(i)}>✕</button>
+                </div>
+              ))}
+              {images.length < 10 && (
+                <div className="ref-img-slot" onClick={() => fileRef.current?.click()}>
+                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+                    <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
                   </svg>
                 </div>
-                <div className="pipeline-info">
-                  <div className="pipeline-name">{wf.name}</div>
-                  <div className="pipeline-detail">
-                    {wf.nodes?.length || 0} nodes · Updated {new Date(wf.updated_at).toLocaleDateString()}
+              )}
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" multiple style={{ display: 'none' }} onChange={e => handleImageUpload(e.target.files)} />
+          </>
+        )}
+
+        {/* Pipelines */}
+        {activeTab === 'pipelines' && (
+          <>
+            <div
+              onClick={() => onNewCarousel?.()}
+              style={{
+                background: 'var(--accent-bg)', border: '1px solid #bfdbfe',
+                borderRadius: 10, padding: '14px 18px', marginBottom: 14,
+                display: 'flex', alignItems: 'center', gap: 12, cursor: 'pointer',
+                transition: 'all 0.12s',
+              }}
+              onMouseEnter={e => e.currentTarget.style.background = '#dbeafe'}
+              onMouseLeave={e => e.currentTarget.style.background = 'var(--accent-bg)'}
+            >
+              <div style={{ width: 34, height: 34, borderRadius: 9, background: 'var(--accent)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="white" strokeWidth="2">
+                  <rect x="2" y="3" width="6" height="18" rx="1"/><rect x="9" y="3" width="6" height="18" rx="1"/><rect x="16" y="3" width="6" height="18" rx="1"/>
+                </svg>
+              </div>
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--accent)' }}>Carousel Pipeline</div>
+                <div style={{ fontSize: 11, color: '#3b82f6', marginTop: 2 }}>Generate full AI carousels — idea → prompts → images</div>
+              </div>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="var(--accent)" strokeWidth="2.5"><polyline points="9 18 15 12 9 6"/></svg>
+            </div>
+
+            <div className="pipeline-list">
+              {workflows.map(wf => (
+                <div key={wf.id} className="pipeline-item">
+                  <div className="pipeline-type-icon video">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                      <rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/>
+                      <rect x="3" y="14" width="7" height="7" rx="1"/><line x1="14" y1="17" x2="21" y2="17"/><line x1="17" y1="14" x2="17" y2="21"/>
+                    </svg>
                   </div>
+                  <div className="pipeline-info">
+                    <div className="pipeline-name">{wf.name}</div>
+                    <div className="pipeline-detail">{wf.nodes?.length || 0} nodes · Updated {new Date(wf.updated_at).toLocaleDateString()}</div>
+                  </div>
+                  <button className="btn btn-secondary btn-sm" onClick={() => onOpenPipeline?.(wf.id)}>Open</button>
                 </div>
-                <button className="btn btn-secondary btn-sm" onClick={() => onOpenPipeline?.(wf.id)}>
-                  Open
-                </button>
-              </div>
-            ))}
-            {workflows.length === 0 && (
-              <div style={{ color:'var(--text-muted)', fontSize:13, textAlign:'center', padding:'12px 0' }}>
-                No node pipelines yet
-              </div>
-            )}
-          </div>
-          <button className="add-pipeline-btn" style={{ marginTop: 12 }} onClick={() => onNewPipeline?.()}>
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
-              <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
-            </svg>
-            New Node Pipeline
-          </button>
-        </Section>
+              ))}
+              {workflows.length === 0 && (
+                <div style={{ color: 'var(--text-muted)', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>No node pipelines yet</div>
+              )}
+            </div>
+            <button className="add-pipeline-btn" style={{ marginTop: 12 }} onClick={() => onNewPipeline?.()}>
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+              </svg>
+              New Node Pipeline
+            </button>
+          </>
+        )}
 
         {/* Posts */}
-        {(() => {
-          const postedCount    = executions.filter(e => e.posted).length
-          const notPostedCount = executions.length - postedCount
-
-          async function togglePosted(exId, current) {
-            const posted = !current
-            setExecutions(prev => prev.map(e => e.id === exId ? { ...e, posted } : e))
-            if (selectedPost?.id === exId) setSelectedPost(s => ({ ...s, posted }))
-            await supabase.from('carousel_executions').update({ posted }).eq('id', exId)
-          }
-
-          const sub = executions.length === 0
-            ? 'No posts yet'
-            : `${postedCount} posted · ${notPostedCount} not posted`
-
-          if (selectedPost) {
-            const imgs = selectedPost.images || []
-            return (
-              <Section id="section-posts" title="Posts" sub={sub} defaultOpen={true}>
+        {activeTab === 'posts' && (
+          <>
+            {selectedPost ? (
+              <>
+                {/* Post detail */}
                 <div style={{ marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
-                  <button
-                    className="btn btn-ghost btn-sm"
-                    onClick={() => setSelectedPost(null)}
-                    style={{ gap: 5, paddingLeft: 6 }}
-                  >
+                  <button className="btn btn-ghost btn-sm" onClick={() => setSelectedPost(null)} style={{ gap: 5, paddingLeft: 6 }}>
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
                     All Posts
                   </button>
@@ -569,12 +570,10 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
                   </button>
                 </div>
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(140px, 1fr))', gap: 8 }}>
-                  {imgs.map(img => (
+                  {(selectedPost.images || []).map(img => (
                     <div key={img.position} style={{ position: 'relative', paddingTop: '125%', background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)' }}>
                       <img src={img.src} alt={`Slide ${img.position}`} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                      <div style={{ position: 'absolute', top: 6, left: 6, width: 18, height: 18, borderRadius: 4, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>
-                        {img.position}
-                      </div>
+                      <div style={{ position: 'absolute', top: 6, left: 6, width: 18, height: 18, borderRadius: 4, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 9, fontWeight: 700, color: 'white' }}>{img.position}</div>
                       <a href={img.src} download={`slide-${img.position}.png`} onClick={e => e.stopPropagation()} style={{ position: 'absolute', top: 6, right: 6, width: 24, height: 24, borderRadius: 5, background: 'rgba(0,0,0,0.55)', display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'white', textDecoration: 'none' }}>
                         <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                       </a>
@@ -585,9 +584,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
                   <div style={{ marginTop: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Caption</span>
-                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, gap: 5, padding: '3px 8px' }} onClick={() => navigator.clipboard.writeText(selectedPost.caption)}>
-                        Copy
-                      </button>
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, gap: 5, padding: '3px 8px' }} onClick={() => navigator.clipboard.writeText(selectedPost.caption)}>Copy</button>
                     </div>
                     <div style={{ background: 'var(--surface2)', borderRadius: 10, padding: '12px 14px', fontSize: 13, color: 'var(--text)', whiteSpace: 'pre-wrap', lineHeight: 1.6, border: '1px solid var(--border)' }}>
                       {selectedPost.caption}
@@ -598,9 +595,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
                   <div style={{ marginTop: 14 }}>
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 8 }}>
                       <span style={{ fontSize: 11, fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.06em' }}>Hashtags</span>
-                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, gap: 5, padding: '3px 8px' }} onClick={() => navigator.clipboard.writeText(selectedPost.hashtags.join(' '))}>
-                        Copy all
-                      </button>
+                      <button className="btn btn-ghost btn-sm" style={{ fontSize: 11, gap: 5, padding: '3px 8px' }} onClick={() => navigator.clipboard.writeText(selectedPost.hashtags.join(' '))}>Copy all</button>
                     </div>
                     <div style={{ display: 'flex', flexWrap: 'wrap', gap: 6 }}>
                       {selectedPost.hashtags.map((tag, i) => (
@@ -609,69 +604,73 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onNewPipe
                     </div>
                   </div>
                 )}
-              </Section>
-            )
-          }
+              </>
+            ) : (
+              <>
+                {/* Posts sub-header */}
+                {executions.length > 0 && (
+                  <div style={{ fontSize: 12, color: 'var(--text-muted)', marginBottom: 14 }}>
+                    {postedCount} posted · {notPostedCount} not posted
+                  </div>
+                )}
+                {executions.length === 0 ? (
+                  <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '40px 0' }}>
+                    No posts yet — run a Carousel Pipeline to generate content.
+                  </p>
+                ) : (
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
+                    {executions.map(ex => {
+                      const thumb = ex.images?.[0]?.src
+                      return (
+                        <div
+                          key={ex.id}
+                          onClick={() => setSelectedPost(ex)}
+                          style={{ background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
+                          onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
+                          onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                        >
+                          <div style={{ position: 'relative', paddingTop: '100%', background: 'var(--surface)' }}>
+                            {thumb
+                              ? <img src={thumb} alt={ex.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
+                              : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
+                                  <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
+                                </div>
+                            }
+                            <div style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: 'rgba(0,0,0,0.55)', color: 'white' }}>
+                              {ex.images?.length || 0}
+                            </div>
+                          </div>
+                          <div style={{ padding: '8px 10px' }}>
+                            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.title}</div>
+                            {ex.topic && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.topic}</div>}
+                            <div style={{ marginTop: 6 }}>
+                              <button
+                                onClick={e => { e.stopPropagation(); togglePosted(ex.id, ex.posted) }}
+                                style={{
+                                  padding: '2px 8px', borderRadius: 20, border: '1px solid',
+                                  fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
+                                  background: ex.posted ? 'rgba(74,222,128,0.12)' : 'transparent',
+                                  borderColor: ex.posted ? '#4ade80' : 'var(--border)',
+                                  color: ex.posted ? '#4ade80' : 'var(--text-muted)',
+                                  transition: 'all 0.15s',
+                                }}
+                              >
+                                <span style={{ width: 4, height: 4, borderRadius: '50%', background: ex.posted ? '#4ade80' : 'var(--text-muted)', flexShrink: 0 }} />
+                                {ex.posted ? 'Posted' : 'Not posted'}
+                              </button>
+                            </div>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
+              </>
+            )}
+          </>
+        )}
 
-          return (
-            <Section id="section-posts" title="Posts" sub={sub}>
-              {executions.length === 0 ? (
-                <p style={{ fontSize: 13, color: 'var(--text-muted)', textAlign: 'center', padding: '16px 0' }}>
-                  No posts yet — run a Carousel Pipeline to generate content.
-                </p>
-              ) : (
-                <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(160px, 1fr))', gap: 10 }}>
-                  {executions.map(ex => {
-                    const thumb = ex.images?.[0]?.src
-                    return (
-                      <div
-                        key={ex.id}
-                        onClick={() => setSelectedPost(ex)}
-                        style={{ background: 'var(--surface2)', borderRadius: 10, overflow: 'hidden', border: '1px solid var(--border)', cursor: 'pointer', transition: 'box-shadow 0.12s' }}
-                        onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
-                        onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
-                      >
-                        <div style={{ position: 'relative', paddingTop: '100%', background: 'var(--surface)' }}>
-                          {thumb
-                            ? <img src={thumb} alt={ex.title} style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover' }} />
-                            : <div style={{ position: 'absolute', inset: 0, display: 'flex', alignItems: 'center', justifyContent: 'center', color: 'var(--text-muted)' }}>
-                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/></svg>
-                              </div>
-                          }
-                          <div style={{ position: 'absolute', top: 6, right: 6, fontSize: 9, fontWeight: 700, padding: '2px 6px', borderRadius: 20, background: 'rgba(0,0,0,0.55)', color: 'white' }}>
-                            {ex.images?.length || 0}
-                          </div>
-                        </div>
-                        <div style={{ padding: '8px 10px' }}>
-                          <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.title}</div>
-                          {ex.topic && <div style={{ fontSize: 10, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.topic}</div>}
-                          <div style={{ marginTop: 6 }}>
-                            <button
-                              onClick={e => { e.stopPropagation(); togglePosted(ex.id, ex.posted) }}
-                              style={{
-                                padding: '2px 8px', borderRadius: 20, border: '1px solid',
-                                fontSize: 9, fontWeight: 600, cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 4,
-                                background: ex.posted ? 'rgba(74,222,128,0.12)' : 'transparent',
-                                borderColor: ex.posted ? '#4ade80' : 'var(--border)',
-                                color: ex.posted ? '#4ade80' : 'var(--text-muted)',
-                                transition: 'all 0.15s',
-                              }}
-                            >
-                              <span style={{ width: 4, height: 4, borderRadius: '50%', background: ex.posted ? '#4ade80' : 'var(--text-muted)', flexShrink: 0 }} />
-                              {ex.posted ? 'Posted' : 'Not posted'}
-                            </button>
-                          </div>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </Section>
-          )
-        })()}
       </div>
-
     </div>
   )
 }

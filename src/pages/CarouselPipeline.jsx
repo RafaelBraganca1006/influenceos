@@ -17,7 +17,8 @@ function fromDbPip(row) {
     topicList:     row.topic_list || [],
     p1Prompt:      row.p1_prompt,
     p2Prompt:      row.p2_prompt,
-    hashtagCount:  row.hashtag_count || 20,
+    p4Prompt:      row.p4_prompt,
+    hashtagCount:  row.hashtag_count || 5,
     createdAt:     row.created_at,
     updatedAt:     row.updated_at,
   }
@@ -34,7 +35,8 @@ function toDbPip(pip) {
     topic_list:     pip.topicList || [],
     p1_prompt:      pip.p1Prompt ?? null,
     p2_prompt:      pip.p2Prompt ?? null,
-    hashtag_count:  pip.hashtagCount || 20,
+    p4_prompt:      pip.p4Prompt ?? null,
+    hashtag_count:  pip.hashtagCount || 5,
     updated_at:     new Date().toISOString(),
   }
 }
@@ -804,7 +806,9 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const [p4Status, setP4Status]       = useState('idle')
   const [p4Error, setP4Error]         = useState('')
   const [captionResult, setCaptionResult] = useState(null)
-  const [hashtagCount, setHashtagCount]   = useState(pip.hashtagCount || 20)
+  const [hashtagCount, setHashtagCount]   = useState(pip.hashtagCount || 5)
+  const [p4Prompt, setP4Prompt]           = useState(pip.p4Prompt || null)
+  const [p4PromptOpen, setP4PromptOpen]   = useState(false)
 
   // Pipeline name
   const [name, setName]               = useState(pip.name)
@@ -828,9 +832,29 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const p2PromptDefault = buildSlidePromptsPrompt(inf, idea || { topic: '' }, slideCount, aspectRatio)
   const p2PromptDisplay = p2Prompt || p2PromptDefault
 
+  // Compute p4 prompt
+  const p4PromptDefault = buildCaptionPrompt(inf, idea || { topic: '' }, hashtagCount)
+  const p4PromptDisplay = p4Prompt || p4PromptDefault
+
   // Auto-save helper
   function save(patch) {
     onUpdate({ ...pip, ...patch, updatedAt: new Date().toISOString() })
+  }
+
+  // Manual save-all — flushes every current setting to DB immediately
+  const [isDirty, setIsDirty] = useState(false)
+  function markDirty() { setIsDirty(true) }
+  function saveAll() {
+    save({
+      ideaMode,
+      p1Prompt,
+      slideCount,
+      aspectRatio,
+      p2Prompt,
+      hashtagCount,
+      p4Prompt,
+    })
+    setIsDirty(false)
   }
 
   // ── Topic list helpers ─────────────────────────────────────────────────────
@@ -952,7 +976,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     if (!idea) throw new Error('Generate an idea first (Phase 1).')
     if (!geminiKey) throw new Error('No Gemini API key — go to Settings.')
     setP4Status('loading'); setP4Error('')
-    const result = await generateCaption(geminiKey, inf, idea, hashtagCount)
+    const result = await generateCaption(geminiKey, inf, idea, hashtagCount, p4Prompt || undefined)
     setCaptionResult(result)
     setP4Status('done')
     return result
@@ -1105,6 +1129,30 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
             Cancel
           </button>
         )}
+        {isDirty && (
+          <span style={{ fontSize: 11, color: '#f97316', flexShrink: 0, fontWeight: 500 }}>Unsaved changes</span>
+        )}
+        <button
+          className="btn btn-secondary btn-sm"
+          onClick={saveAll}
+          disabled={busy}
+          style={{
+            flexShrink: 0, gap: 6,
+            ...(isDirty ? {} : { color: 'var(--green)', borderColor: 'var(--green)', background: 'rgba(74,222,128,0.08)' }),
+          }}
+        >
+          {isDirty ? (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+              Save
+            </>
+          ) : (
+            <>
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+              Saved
+            </>
+          )}
+        </button>
         <button
           className="btn btn-primary"
           onClick={runWorkflow}
@@ -1148,13 +1196,13 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
               <div style={{ marginBottom: 16 }}>
                 <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 6 }}>Mode</div>
                 <div className="toggle-row" style={{ maxWidth: 360 }}>
-                  <button className={`toggle-btn ${ideaMode === 'auto' ? 'active' : ''}`} onClick={() => setIdeaMode('auto')}>
+                  <button className={`toggle-btn ${ideaMode === 'auto' ? 'active' : ''}`} onClick={() => { setIdeaMode('auto'); markDirty() }}>
                     Auto-generate
                   </button>
-                  <button className={`toggle-btn ${ideaMode === 'manual' ? 'active' : ''}`} onClick={() => setIdeaMode('manual')}>
+                  <button className={`toggle-btn ${ideaMode === 'manual' ? 'active' : ''}`} onClick={() => { setIdeaMode('manual'); markDirty() }}>
                     Manual
                   </button>
-                  <button className={`toggle-btn ${ideaMode === 'list' ? 'active' : ''}`} onClick={() => setIdeaMode('list')}>
+                  <button className={`toggle-btn ${ideaMode === 'list' ? 'active' : ''}`} onClick={() => { setIdeaMode('list'); markDirty() }}>
                     Topic List
                   </button>
                 </div>
@@ -1225,8 +1273,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
               {ideaMode === 'auto' && (
                 <PromptEditor
                   prompt={p1Prompt}
-                  onChange={p => { setP1Prompt(p); save({ p1Prompt: p }) }}
-                  onReset={() => { const d = buildIdeationPrompt(inf); setP1Prompt(d); save({ p1Prompt: d }) }}
+                  onChange={p => { setP1Prompt(p); markDirty() }}
+                  onReset={() => { setP1Prompt(buildIdeationPrompt(inf)); markDirty() }}
                   open={p1PromptOpen}
                   onToggle={() => setP1PromptOpen(o => !o)}
                 />
@@ -1246,7 +1294,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
             <div style={{ width: 1.5, background: 'var(--border)', flex: 1, minHeight: 28, marginTop: 8 }} />
           </div>
           {/* Card */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, paddingBottom: 16 }}>
             <PhaseCard
               title="Slide Prompts"
               sub="Generate an image generation prompt for each slide"
@@ -1256,11 +1304,11 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
               <div style={{ display: 'flex', gap: 28, flexWrap: 'wrap', marginBottom: 16, alignItems: 'flex-end' }}>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 7 }}>Slides</div>
-                  <Stepper value={slideCount} min={1} max={10} onChange={setSlideCount} />
+                  <Stepper value={slideCount} min={1} max={10} onChange={v => { setSlideCount(v); markDirty() }} />
                 </div>
                 <div>
                   <div style={{ fontSize: 11, fontWeight: 600, color: 'var(--text)', marginBottom: 7 }}>Aspect ratio</div>
-                  <RatioPicker value={aspectRatio} onChange={setAspectRatio} />
+                  <RatioPicker value={aspectRatio} onChange={v => { setAspectRatio(v); markDirty() }} />
                 </div>
               </div>
 
@@ -1293,8 +1341,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
               {p2PromptDisplay && (
                 <PromptEditor
                   prompt={p2PromptDisplay}
-                  onChange={p => { setP2Prompt(p); save({ p2Prompt: p }) }}
-                  onReset={() => { setP2Prompt(null); save({ p2Prompt: null }) }}
+                  onChange={p => { setP2Prompt(p); markDirty() }}
+                  onReset={() => { setP2Prompt(null); markDirty() }}
                   open={p2PromptOpen}
                   onToggle={() => setP2PromptOpen(o => !o)}
                 />
@@ -1342,7 +1390,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
             <div style={{ width: 1.5, background: 'var(--border)', flex: 1, minHeight: 28, marginTop: 8 }} />
           </div>
           {/* Card */}
-          <div style={{ flex: 1 }}>
+          <div style={{ flex: 1, paddingBottom: 16 }}>
             <PhaseCard
               title="Image Generation"
               sub="Generate images for each slide using reference photos"
@@ -1414,17 +1462,25 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
               <div style={{ marginBottom: 14 }}>
                 <label className="form-label" style={{ marginBottom: 6, display: 'block' }}>Hashtag count</label>
                 <div className="toggle-row" style={{ maxWidth: 300 }}>
-                  {[10, 20, 30].map(n => (
+                  {[3, 4, 5].map(n => (
                     <button
                       key={n}
                       className={`toggle-btn ${hashtagCount === n ? 'active' : ''}`}
-                      onClick={() => { setHashtagCount(n); save({ hashtagCount: n }) }}
+                      onClick={() => { setHashtagCount(n); markDirty() }}
                     >
                       {n} hashtags
                     </button>
                   ))}
                 </div>
               </div>
+
+              <PromptEditor
+                prompt={p4PromptDisplay}
+                onChange={p => { setP4Prompt(p); markDirty() }}
+                onReset={() => { setP4Prompt(null); markDirty() }}
+                open={p4PromptOpen}
+                onToggle={() => setP4PromptOpen(o => !o)}
+              />
 
               {/* Generated output */}
               {captionResult && (
