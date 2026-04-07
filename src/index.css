@@ -66,13 +66,13 @@ button { font-family: inherit; }
   .mobile-header{ display: flex; }
   .page-content { padding: 16px 12px; }
 
-  /* Metrics: 2-col grid, compact cards, no absolute icon */
-  .metrics-row  { grid-template-columns: repeat(2, 1fr); gap: 8px; margin-bottom: 14px; }
-  .metric-card  { padding: 14px 14px; }
-  .metric-icon  { position: static; width: 26px; height: 26px; border-radius: 7px; margin-bottom: 10px; }
-  .metric-label { font-size: 11px; margin-bottom: 4px; }
-  .metric-value { font-size: 22px; }
-  .metric-sub   { font-size: 11px; margin-top: 3px; }
+  /* Metrics: single column, horizontal card layout */
+  .metrics-row  { grid-template-columns: 1fr; gap: 8px; margin-bottom: 14px; }
+  .metric-card  { padding: 14px 16px; display: flex; align-items: center; gap: 14px; }
+  .metric-icon  { position: static; width: 38px; height: 38px; border-radius: 10px; flex-shrink: 0; }
+  .metric-label { font-size: 11px; margin-bottom: 2px; }
+  .metric-value { font-size: 20px; }
+  .metric-sub   { font-size: 11px; margin-top: 2px; }
 
   /* Dashboard overview: hide table, show list */
   .dash-table-wrap  { display: none; }
