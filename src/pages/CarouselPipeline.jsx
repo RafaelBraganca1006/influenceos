@@ -1557,7 +1557,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   )
 }
 
-// ── Executions View ───────────────────────────────────────────────────────────
+// ── Executions View (kept for reference — removed from routing) ───────────────
 function ExecutionsView({ influencerId, onBack }) {
   const [executions, setExecutions] = useState([])
   const [loading, setLoading]       = useState(true)
@@ -1815,116 +1815,59 @@ function SpinnerIcon({ size = 13 }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function CarouselPipeline({ influencerId, onBack }) {
-  const [inf, setInf]               = useState(null)
-  const [geminiKey, setGeminiKey]   = useState('')
-  const [loadingInit, setLoadingInit] = useState(true)
-  const [pips, setPips]             = useState([])
-  const [currentId, setCurrentId]   = useState(null)
-  const [showExecutions, setShowExecutions] = useState(false)
-  const saveTimerRef                = useRef(null)
+export default function CarouselPipeline({ influencerId, pipelineId, onBack, onDelete }) {
+  const [inf, setInf]             = useState(null)
+  const [geminiKey, setGeminiKey] = useState('')
+  const [pip, setPip]             = useState(null)
+  const [loading, setLoading]     = useState(true)
+  const saveTimerRef              = useRef(null)
 
   useEffect(() => {
     async function init() {
       const [infData, { data: keyData }, { data: pipData }] = await Promise.all([
         Store.get(influencerId),
         supabase.from('api_keys').select('gemini_key').single(),
-        supabase.from('carousel_pipelines').select('*').eq('influencer_id', influencerId).order('created_at', { ascending: false }),
+        supabase.from('carousel_pipelines').select('*').eq('id', pipelineId).single(),
       ])
       setInf(infData)
       setGeminiKey(keyData?.gemini_key || '')
-      setPips((pipData || []).map(fromDbPip))
-      setLoadingInit(false)
+      if (pipData) setPip(fromDbPip(pipData))
+      setLoading(false)
     }
     init()
-  }, [influencerId])
+  }, [influencerId, pipelineId])
 
-  async function createPipeline() {
-    const { data: { user } } = await supabase.auth.getUser()
-    const n = pips.length + 1
-    const id = genId()
-    const row = {
-      id,
-      influencer_id: influencerId,
-      user_id:       user.id,
-      name:          `Carousel #${n}`,
-      idea_mode:     'auto',
-      idea:          null,
-      slide_count:   5,
-      aspect_ratio:  '4:5',
-      prompts_result: null,
-      topic_list:    [],
-      p1_prompt:     null,
-      p2_prompt:     null,
-    }
-    const { data, error } = await supabase.from('carousel_pipelines').insert(row).select().single()
-    if (error) { console.error(error); return }
-    setPips(prev => [fromDbPip(data), ...prev])
-    setCurrentId(data.id)
-  }
-
-  async function deletePipeline(id) {
-    if (!confirm('Delete this pipeline?')) return
-    await supabase.from('carousel_pipelines').delete().eq('id', id)
-    setPips(prev => prev.filter(p => p.id !== id))
-    if (currentId === id) setCurrentId(null)
-  }
-
-  function updatePipeline(updated) {
-    // Immediate UI update
-    setPips(prev => prev.map(p => p.id === updated.id ? updated : p))
-    // Debounced Supabase write (800 ms)
+  function handleUpdate(updated) {
+    setPip(updated)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
       await supabase.from('carousel_pipelines').update(toDbPip(updated)).eq('id', updated.id)
     }, 800)
   }
 
-  if (loadingInit) {
-    return (
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, color: 'var(--text-muted)', fontSize: 14 }}>
-        Loading...
-      </div>
-    )
-  }
+  if (loading) return (
+    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'center', padding: 80, color: 'var(--text-muted)', fontSize: 14 }}>
+      Loading...
+    </div>
+  )
 
-  if (!inf) {
-    return (
-      <div className="empty-state" style={{ marginTop: 60 }}>
-        <div className="empty-title">Influencer not found</div>
-        <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={onBack}>Go back</button>
-      </div>
-    )
-  }
-
-  const currentPip = pips.find(p => p.id === currentId) || null
+  if (!inf || !pip) return (
+    <div className="empty-state" style={{ marginTop: 60 }}>
+      <div className="empty-title">Pipeline not found</div>
+      <button className="btn btn-secondary" style={{ marginTop: 16 }} onClick={onBack}>Go back</button>
+    </div>
+  )
 
   return (
     <>
       <style>{`@keyframes carousel-spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }`}</style>
-
-      {showExecutions ? (
-        <ExecutionsView
-          influencerId={influencerId}
-          onBack={() => setShowExecutions(false)}
-        />
-      ) : currentPip ? (
-        <EditorView
-          pip={currentPip}
-          inf={inf}
-          geminiKey={geminiKey}
-          onUpdate={updatePipeline}
-          onBack={() => setCurrentId(null)}
-        />
-      ) : (
-        <ListView
-          pips={pips}
-          onOpen={id => setCurrentId(id)}
-          onCreate={createPipeline}
-          onDelete={deletePipeline}
-          onOpenExecutions={() => setShowExecutions(true)}
-        />
-      )}
+      <EditorView
+        pip={pip}
+        inf={inf}
+        geminiKey={geminiKey}
+        onUpdate={handleUpdate}
+        onBack={onBack}
+      />
     </>
   )
 }

@@ -111,6 +111,7 @@ export default function App() {
   const [detailId, setDetailId] = useState(null)
   const [pipelineCtx, setPipelineCtx] = useState(null)   // { influencerId, workflowId }
   const [carouselInfId, setCarouselInfId] = useState(null)
+  const [carouselPipId, setCarouselPipId] = useState(null)
   const [influencerCount, setInfluencerCount] = useState(0)
 
   useEffect(() => {
@@ -133,13 +134,15 @@ export default function App() {
     else setPage('influencers')
   }
 
-  function openCarouselPipeline(influencerId) {
+  function openCarouselPipeline(influencerId, pipelineId) {
     setCarouselInfId(influencerId)
+    setCarouselPipId(pipelineId)
     setPage('carousel-pipeline')
   }
   function closeCarouselPipeline() {
     const infId = carouselInfId
     setCarouselInfId(null)
+    setCarouselPipId(null)
     if (infId) { setDetailId(infId); setPage('detail') }
     else setPage('influencers')
   }
@@ -216,13 +219,14 @@ export default function App() {
               id={detailId}
               onBack={closeDetail}
               onOpenPipeline={(wfId) => openPipelineBuilder(detailId, wfId)}
-              onNewPipeline={() => openPipelineBuilder(detailId, null)}
-              onNewCarousel={() => openCarouselPipeline(detailId)}
+              onOpenCarousel={(pipId) => openCarouselPipeline(detailId, pipId)}
+              onNewNodePipeline={() => openPipelineBuilder(detailId, null)}
             />
           )}
-          {page === 'carousel-pipeline' && carouselInfId && (
+          {page === 'carousel-pipeline' && carouselInfId && carouselPipId && (
             <CarouselPipeline
               influencerId={carouselInfId}
+              pipelineId={carouselPipId}
               onBack={closeCarouselPipeline}
             />
           )}
