@@ -111,8 +111,67 @@ export async function generateTopicList(apiKey, inf, count = 10, customPrompt) {
   const user     = customPrompt?.user   ?? defaults.user
   const raw = await geminiText(apiKey, { system, user })
   const parsed = extractJSON(raw)
-  if (!Array.isArray(parsed.topics)) throw new Error('Unexpected response format from AI.')
-  return parsed.topics
+  const topics = Array.isArray(parsed) ? parsed : parsed.topics
+  if (!Array.isArray(topics)) throw new Error('Unexpected response format from AI.')
+  // Normalize: if Gemini returned objects instead of strings, extract the most meaningful field
+  return topics.map(t =>
+    typeof t === 'string' ? t : t.title || t.topic || t.text || t.description || JSON.stringify(t)
+  )
+}
+
+// ── Simple Video Pipeline prompts ─────────────────────────────────────────────
+export function buildVideoIdeaPrompt(inf) {
+  const persona = buildPersonaContext(inf)
+  return {
+    system: `You are a creative video director for this Instagram creator:\n\n${persona}\n\nCreate short, visually striking 8-second single-shot video concepts that feel authentic to their brand.`,
+    user: `Generate ONE compelling 8-second video concept for this creator.
+It must be a single continuous shot — no cuts, no text overlays.
+Focus on a simple but visually powerful moment.
+
+Return ONLY valid JSON:
+{
+  "concept": "One clear sentence describing what happens in the video",
+  "mood": "The visual mood/atmosphere (e.g. cinematic, dreamy, energetic, intimate)"
+}`,
+  }
+}
+
+export function buildVideoPromptsPrompt(inf, idea) {
+  const persona = buildPersonaContext(inf)
+  return {
+    system: `You are a cinematographer and visual effects artist working for:\n\n${persona}`,
+    user: `Create prompts for an 8-second video based on this concept:
+"${idea.concept}"
+Mood: ${idea.mood}
+
+IMPORTANT rules for every frame prompt:
+- Target ultra-realistic 4K photography/cinematography quality
+- To reference the person, simply write "A woman (from the reference image)" — do NOT describe physical appearance (face, hair, body, skin tone, clothing, etc.)
+- Focus on: setting/environment, composition, camera angle, lens, lighting quality, color palette, mood, time of day, textures, depth of field, background elements
+
+Return ONLY valid JSON:
+{
+  "firstFramePrompt": "Detailed prompt for the very first frame. Describe environment, composition, camera, lighting, color palette. No physical appearance.",
+  "lastFramePrompt": "Detailed prompt for the very last frame. Must be visually connected to the first frame — same scene, different moment. No physical appearance.",
+  "motionPrompt": "Precise description of all motion between first and last frame: what moves, how, camera behavior, lighting changes. 2-3 sentences, cinematic."
+}`,
+  }
+}
+
+export async function generateVideoIdea(apiKey, inf, customPrompt) {
+  const defaults = buildVideoIdeaPrompt(inf)
+  const system = customPrompt?.system ?? defaults.system
+  const user   = customPrompt?.user   ?? defaults.user
+  const raw = await geminiText(apiKey, { system, user })
+  return extractJSON(raw)
+}
+
+export async function generateVideoPrompts(apiKey, inf, idea, customPrompt) {
+  const defaults = buildVideoPromptsPrompt(inf, idea)
+  const system = customPrompt?.system ?? defaults.system
+  const user   = customPrompt?.user   ?? defaults.user
+  const raw = await geminiText(apiKey, { system, user })
+  return extractJSON(raw)
 }
 
 // ── Phase 4: Caption + Hashtags ───────────────────────────────────────────────

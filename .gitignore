@@ -7,3 +7,12 @@ dist/
 .DS_Store
 
 .vercel
+
+# Don't publish old versions or private assets
+Old Versions(Don't read)/
+*.pdf
+design.jpg
+styles.css
+
+# Claude Code
+.claude/

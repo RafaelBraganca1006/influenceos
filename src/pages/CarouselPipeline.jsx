@@ -435,7 +435,7 @@ function TopicListPanel({ topics, onTopicsChange, geminiKey, inf }) {
                     textDecoration: t.used ? 'line-through' : 'none',
                     lineHeight: 1.4,
                   }}>
-                    {t.text}
+                    {typeof t.text === 'string' ? t.text : t.text?.title || t.text?.topic || t.text?.text || JSON.stringify(t.text)}
                   </span>
                   {isNext && (
                     <span style={{ fontSize: 10, fontWeight: 700, color: 'var(--accent)', letterSpacing: '0.05em' }}>NEXT</span>
@@ -880,7 +880,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     } else if (ideaMode === 'list') {
       const next = topicList.find(t => !t.used)
       if (!next) throw new Error('All topics have been used. Add more or reset the list.')
-      result = { topic: next.text }
+      const topicText = typeof next.text === 'string' ? next.text : next.text?.title || next.text?.topic || next.text?.text || JSON.stringify(next.text)
+      result = { topic: topicText }
       const updatedList = topicList.map(t => t.id === next.id ? { ...t, used: true, usedAt: new Date().toISOString() } : t)
       setTopicList(updatedList)
       save({ idea: result, promptsResult: null, ideaMode: 'list', topicList: updatedList, p2Prompt: null })
@@ -949,7 +950,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     return final
   }
 
-  async function saveExecution(images, capData = null) {
+  async function saveExecution(images, capData = null, ideaOverride) {
+    const currentIdea = ideaOverride || idea
     const doneImages = images.filter(img => img.status === 'done' && img.src)
     if (!doneImages.length) return
     const { data: { user } } = await supabase.auth.getUser()
@@ -963,7 +965,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
       influencer_id:  inf.id,
       user_id:        user.id,
       title:          `Post #${(count || 0) + 1}`,
-      topic:          idea?.topic || '',
+      topic:          currentIdea?.topic || '',
       images:         doneImages.map(img => ({ position: img.position, src: img.src })),
       caption:        capData?.caption  || null,
       hashtags:       capData?.hashtags || null,
@@ -972,11 +974,12 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   }
 
   // ── Phase 4 executor ──────────────────────────────────────────────────────
-  async function executePhase4() {
-    if (!idea) throw new Error('Generate an idea first (Phase 1).')
+  async function executePhase4(ideaOverride) {
+    const currentIdea = ideaOverride || idea
+    if (!currentIdea) throw new Error('Generate an idea first (Phase 1).')
     if (!geminiKey) throw new Error('No Gemini API key — go to Settings.')
     setP4Status('loading'); setP4Error('')
-    const result = await generateCaption(geminiKey, inf, idea, hashtagCount, p4Prompt || undefined)
+    const result = await generateCaption(geminiKey, inf, currentIdea, hashtagCount, p4Prompt || undefined)
     setCaptionResult(result)
     setP4Status('done')
     return result
@@ -1068,8 +1071,8 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
       const finalImages = await executePhase3(promptsRes.slides)
       if (cancelRef.current) return
       let capData = null
-      try { capData = await executePhase4() } catch {}  // phase 4 failure doesn't block save
-      if (!cancelRef.current) await saveExecution(finalImages, capData)
+      try { capData = await executePhase4(ideaResult) } catch {}  // phase 4 failure doesn't block save
+      if (!cancelRef.current) await saveExecution(finalImages, capData, ideaResult)
     } catch (err) {
       // errors already set inside executors
     } finally {

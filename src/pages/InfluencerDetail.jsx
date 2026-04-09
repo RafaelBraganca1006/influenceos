@@ -1,6 +1,7 @@
 import { useState, useRef, useCallback, useEffect } from 'react'
 import { Store } from '../store'
 import { supabase } from '../supabase'
+import { getToken, listFolders, savePostToDrive } from '../services/drive'
 
 const PLATFORM_LABELS = { ig: 'Instagram', tt: 'TikTok', yt: 'YouTube' }
 
@@ -553,6 +554,192 @@ function FieldCard({ label, children }) {
   )
 }
 
+// ── Save to Drive Modal ───────────────────────────────────────────────────────
+const DriveIcon = ({ size = 16 }) => (
+  <svg width={size} height={size} viewBox="0 0 256 229" xmlns="http://www.w3.org/2000/svg" style={{ flexShrink: 0 }}>
+    <path d="M19.354,196.034 L30.644,215.535 C32.99,219.64 36.362,222.866 40.321,225.212 C51.66,210.818 59.553,199.773 64.001,192.075 C68.514,184.264 74.061,172.045 80.642,155.42 C62.906,153.085 49.466,151.918 40.321,151.918 C31.545,151.918 18.105,153.085 0,155.42 C0,159.965 1.173,164.51 3.519,168.616 Z" fill="#0066DA"/>
+    <path d="M215.681,225.212 C219.64,222.866 223.013,219.64 225.358,215.535 L230.05,207.471 L252.484,168.616 C254.829,164.51 256.002,159.965 256.002,155.42 C237.793,153.085 224.377,151.918 215.755,151.918 C206.489,151.918 193.073,153.085 175.507,155.42 C182.01,172.136 187.484,184.355 191.929,192.075 C196.412,199.864 204.33,210.909 215.681,225.212 Z" fill="#EA4335"/>
+    <path d="M128.001,73.311 C141.121,57.466 150.163,45.247 155.126,36.656 C159.123,29.738 163.522,18.692 168.322,3.519 C164.363,1.173 159.818,0 155.126,0 L100.876,0 C96.184,0 91.639,1.32 87.68,3.519 C93.786,20.921 98.968,33.306 103.224,40.673 C107.928,48.815 116.187,59.694 128.001,73.311 Z" fill="#00832D"/>
+    <path d="M175.36,155.42 L80.642,155.42 L40.321,225.212 C44.28,227.558 48.825,228.731 53.517,228.731 L202.485,228.731 C207.177,228.731 211.723,227.411 215.681,225.212 Z" fill="#2684FC"/>
+    <path d="M128.001,73.311 L87.68,3.519 C83.721,5.865 80.349,9.09 78.003,13.196 L3.519,142.224 C1.173,146.329 0,150.874 0,155.42 L80.642,155.42 Z" fill="#00AC47"/>
+    <path d="M215.242,77.71 L177.999,13.196 C175.654,9.09 172.281,5.865 168.322,3.519 L128.001,73.311 L175.36,155.42 L255.856,155.42 C255.856,150.874 254.683,146.329 252.337,142.224 Z" fill="#FFBA00"/>
+  </svg>
+)
+
+function SaveToDriveModal({ post, onClose }) {
+  const [token,    setToken]    = useState(null)
+  const [folders,  setFolders]  = useState([])
+  const [path,     setPath]     = useState([{ id: 'root', name: 'My Drive' }])
+  const [loading,  setLoading]  = useState(true)   // starts loading (auto-connect attempt)
+  const [saving,   setSaving]   = useState(false)
+  const [progress, setProgress] = useState('')
+  const [doneUrl,  setDoneUrl]  = useState(null)
+  const [error,    setError]    = useState('')
+
+  const currentParent = path[path.length - 1]
+
+  // Auto-connect on open using cache/silent — only shows popup if truly needed
+  useEffect(() => {
+    getToken().then(t => {
+      setToken(t)
+      return listFolders(t, 'root')
+    }).then(list => {
+      setFolders(list)
+    }).catch(() => {
+      // Silent failed — wait for user to click "Sign in"
+    }).finally(() => setLoading(false))
+  }, [])
+
+  async function signIn() {
+    setLoading(true); setError('')
+    try {
+      const t = await getToken(true)   // force interactive popup
+      setToken(t)
+      const list = await listFolders(t, 'root')
+      setFolders(list)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function loadFolders(t, parentId) {
+    setLoading(true)
+    try {
+      setFolders(await listFolders(t, parentId))
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  async function navigate(folder) {
+    setPath(p => [...p, { id: folder.id, name: folder.name }])
+    await loadFolders(token, folder.id)
+  }
+
+  async function goBack(idx) {
+    const newPath = path.slice(0, idx + 1)
+    setPath(newPath)
+    await loadFolders(token, newPath[newPath.length - 1].id)
+  }
+
+  async function save() {
+    setSaving(true); setError('')
+    try {
+      const url = await savePostToDrive(token, post, currentParent.id, msg => setProgress(msg))
+      setDoneUrl(url)
+    } catch (e) {
+      setError(e.message)
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  return (
+    <div style={{ position: 'fixed', inset: 0, zIndex: 1000, display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'rgba(0,0,0,0.6)', backdropFilter: 'blur(4px)', padding: 20 }}>
+      <div style={{ background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 16, width: '100%', maxWidth: 440, boxShadow: 'var(--shadow-lg)', display: 'flex', flexDirection: 'column', maxHeight: '80vh' }}>
+
+        {/* Header */}
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10, padding: '18px 20px 14px', borderBottom: '1px solid var(--border)', flexShrink: 0 }}>
+          <DriveIcon size={20} />
+          <div style={{ flex: 1 }}>
+            <div style={{ fontSize: 14, fontWeight: 600 }}>Save to Google Drive</div>
+            <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{post.topic || post.title}</div>
+          </div>
+          <button onClick={onClose} style={{ background: 'none', border: 'none', cursor: 'pointer', color: 'var(--text-muted)', display: 'flex', padding: 4 }}>
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/></svg>
+          </button>
+        </div>
+
+        {/* Body */}
+        <div style={{ flex: 1, overflowY: 'auto', padding: '14px 20px' }}>
+          {doneUrl ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: 13, color: 'var(--green)', fontWeight: 600, marginBottom: 12, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6 }}>
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                Saved successfully
+              </div>
+              <a href={doneUrl} target="_blank" rel="noreferrer" className="btn btn-primary" style={{ fontSize: 12 }}>
+                Open in Drive
+              </a>
+            </div>
+          ) : loading ? (
+            <div style={{ fontSize: 13, color: 'var(--text-muted)', padding: '20px 0', textAlign: 'center' }}>Connecting…</div>
+          ) : !token ? (
+            <div style={{ textAlign: 'center', padding: '20px 0' }}>
+              <div style={{ fontSize: 13, color: 'var(--text-muted)', marginBottom: 16, lineHeight: 1.6 }}>
+                Sign in with Google to pick a folder.
+              </div>
+              {error && <div style={{ fontSize: 12, color: 'var(--red)', marginBottom: 12 }}>{error}</div>}
+              <button className="btn btn-primary" onClick={signIn}>
+                Sign in with Google
+              </button>
+            </div>
+          ) : (
+            <>
+              {/* Breadcrumb */}
+              <div style={{ display: 'flex', alignItems: 'center', gap: 4, flexWrap: 'wrap', marginBottom: 10 }}>
+                {path.map((p, i) => (
+                  <span key={p.id} style={{ display: 'flex', alignItems: 'center', gap: 4 }}>
+                    {i > 0 && <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ color: 'var(--text-muted)' }}><polyline points="9 18 15 12 9 6"/></svg>}
+                    <button
+                      onClick={() => i < path.length - 1 && goBack(i)}
+                      style={{ fontSize: 12, fontWeight: i === path.length - 1 ? 600 : 400, color: i === path.length - 1 ? 'var(--text)' : 'var(--accent)', background: 'none', border: 'none', cursor: i < path.length - 1 ? 'pointer' : 'default', padding: 0, fontFamily: 'inherit' }}
+                    >{p.name}</button>
+                  </span>
+                ))}
+              </div>
+
+              {/* Folder list */}
+              {loading ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '12px 0' }}>Loading…</div>
+              ) : folders.length === 0 ? (
+                <div style={{ fontSize: 12, color: 'var(--text-muted)', padding: '12px 0' }}>No sub-folders here.</div>
+              ) : (
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 2, maxHeight: 220, overflowY: 'auto' }}>
+                  {folders.map(f => (
+                    <button
+                      key={f.id}
+                      onClick={() => navigate(f)}
+                      style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '7px 10px', borderRadius: 8, border: 'none', background: 'transparent', color: 'var(--text)', fontSize: 13, cursor: 'pointer', textAlign: 'left', fontFamily: 'inherit', transition: 'background 0.1s' }}
+                      onMouseEnter={e => e.currentTarget.style.background = 'var(--surface2)'}
+                      onMouseLeave={e => e.currentTarget.style.background = 'transparent'}
+                    >
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" style={{ color: '#ffba00', flexShrink: 0 }}><path d="M22 19a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h5l2 3h9a2 2 0 0 1 2 2z"/></svg>
+                      {f.name}
+                      <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" style={{ marginLeft: 'auto', color: 'var(--text-muted)' }}><polyline points="9 18 15 12 9 6"/></svg>
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {error && <div style={{ fontSize: 12, color: 'var(--red)', marginTop: 10 }}>{error}</div>}
+            </>
+          )}
+        </div>
+
+        {/* Footer */}
+        {token && !doneUrl && !loading && (
+          <div style={{ padding: '12px 20px', borderTop: '1px solid var(--border)', flexShrink: 0, display: 'flex', alignItems: 'center', gap: 10 }}>
+            <div style={{ flex: 1 }}>
+              <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>
+                Save into: <strong style={{ color: 'var(--text)' }}>{currentParent.name}</strong>
+              </div>
+              {saving && <div style={{ fontSize: 11, color: 'var(--accent)', marginTop: 2 }}>{progress}</div>}
+            </div>
+            <button className="btn btn-primary btn-sm" onClick={save} disabled={saving}>
+              {saving ? 'Saving…' : 'Save here'}
+            </button>
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}
+
 // ── Collapsible Section ───────────────────────────────────────────────────────
 function Section({ id, title, sub, children, defaultOpen = false }) {
   const [open, setOpen] = useState(defaultOpen)
@@ -576,7 +763,7 @@ function Section({ id, title, sub, children, defaultOpen = false }) {
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
-export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCarousel, onNewNodePipeline }) {
+export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCarousel, onOpenVideo, onNewNodePipeline }) {
   const [inf, setInf]           = useState(null)
   const [loading, setLoading]   = useState(true)
   const [saved, setSaved]       = useState(true)
@@ -586,12 +773,17 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
   const [accounts, setAccounts]         = useState([])
   const [workflows, setWorkflows]       = useState([])
   const [carouselPips, setCarouselPips] = useState([])
+  const [videoPips, setVideoPips]       = useState([])
   const [showNewPipeline, setShowNewPipeline] = useState(false)
   const [creatingCarousel, setCreatingCarousel] = useState(false)
+  const [creatingVideo, setCreatingVideo]       = useState(false)
   const [images, setImages]         = useState([])
   const [executions, setExecutions]   = useState([])
   const [schedule, setSchedule]       = useState(EMPTY_SCHEDULE)
   const [selectedPost, setSelectedPost] = useState(null)
+  const [datePreset,   setDatePreset]   = useState('all')
+  const [postedFilter, setPostedFilter] = useState('all')  // 'all' | 'posted' | 'not-posted'
+  const [drivePost, setDrivePost] = useState(null)
   const [activeTab, setActiveTab]   = useState('persona')
   const [hoveredImg, setHoveredImg] = useState(null)
   const fileRef = useRef(null)
@@ -630,6 +822,8 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
       .eq('influencer_id', id).order('created_at').then(({ data }) => setWorkflows(data || []))
     supabase.from('carousel_pipelines').select('id, name, slide_count, aspect_ratio, updated_at')
       .eq('influencer_id', id).order('created_at', { ascending: false }).then(({ data }) => setCarouselPips(data || []))
+    supabase.from('video_pipelines').select('id, name, updated_at')
+      .eq('influencer_id', id).order('created_at', { ascending: false }).then(({ data }) => setVideoPips(data || []))
     supabase.from('carousel_executions').select('id, title, topic, images, created_at, posted, caption, hashtags')
       .eq('influencer_id', id).order('created_at', { ascending: false })
       .then(({ data }) => setExecutions(data || []))
@@ -746,6 +940,33 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
     setCarouselPips(prev => prev.filter(p => p.id !== pipId))
   }
 
+  async function createVideoPipeline() {
+    setCreatingVideo(true)
+    const { data: { user } } = await supabase.auth.getUser()
+    const n = videoPips.length + 1
+    const row = {
+      id:            Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+      influencer_id: id,
+      user_id:       user.id,
+      name:          `Video #${n}`,
+      idea_mode:     'auto',
+      idea:          null,
+      prompts:       null,
+    }
+    const { data, error } = await supabase.from('video_pipelines').insert(row).select().single()
+    setCreatingVideo(false)
+    if (error || !data) { console.error(error); return }
+    setVideoPips(prev => [data, ...prev])
+    setShowNewPipeline(false)
+    onOpenVideo?.(data.id)
+  }
+
+  async function deleteVideoPipeline(pipId) {
+    if (!confirm('Delete this pipeline?')) return
+    await supabase.from('video_pipelines').delete().eq('id', pipId)
+    setVideoPips(prev => prev.filter(p => p.id !== pipId))
+  }
+
   if (loading) {
     return (
       <div style={{ display:'flex', alignItems:'center', justifyContent:'center', padding: 80, color:'var(--text-muted)', fontSize:14 }}>
@@ -793,6 +1014,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
   ]
 
   return (
+    <>
     <div style={{ display: 'flex', flexDirection: 'column', margin: '-28px -32px', minHeight: 'calc(100vh - 58px)' }}>
 
       {/* ── Header ── */}
@@ -823,7 +1045,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                 )}
                 <span className={`badge ${inf.status}`}>{inf.status}</span>
                 <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>
-                  {carouselPips.length + workflows.length} pipelines · {executions.length} posts
+                  {carouselPips.length + videoPips.length + workflows.length} pipelines · {executions.length} posts
                 </span>
               </div>
             </div>
@@ -1023,7 +1245,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
         {/* ── Pipelines ── */}
         {activeTab === 'pipelines' && (
           <div>
-            {(carouselPips.length === 0 && workflows.length === 0) ? (
+            {(carouselPips.length === 0 && videoPips.length === 0 && workflows.length === 0) ? (
               <div className="empty-state" style={{ padding: '60px 20px' }}>
                 <svg className="empty-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
                   <path d="M22 12h-4l-3 9L9 3l-3 9H2"/>
@@ -1071,6 +1293,45 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                     <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                       <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'var(--purple-bg)', color: 'var(--purple)' }}>Carousel</span>
                       {cp.updated_at && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(cp.updated_at).toLocaleDateString()}</span>}
+                    </div>
+                  </div>
+                ))}
+
+                {videoPips.map(vp => (
+                  <div
+                    key={vp.id}
+                    onClick={() => onOpenVideo?.(vp.id)}
+                    onMouseEnter={e => e.currentTarget.style.boxShadow = 'var(--shadow-md)'}
+                    onMouseLeave={e => e.currentTarget.style.boxShadow = 'none'}
+                    style={{
+                      background: 'var(--surface)', border: '1px solid var(--border)', borderRadius: 14,
+                      padding: '18px 16px', display: 'flex', flexDirection: 'column', gap: 12,
+                      cursor: 'pointer', transition: 'box-shadow 0.12s',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
+                      <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center', flexShrink: 0 }}>
+                        <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="2">
+                          <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
+                        </svg>
+                      </div>
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ padding: '4px 5px', color: 'var(--text-muted)' }}
+                        onClick={e => { e.stopPropagation(); deleteVideoPipeline(vp.id) }}
+                      >
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                          <polyline points="3 6 5 6 21 6"/><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>
+                        </svg>
+                      </button>
+                    </div>
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>{vp.name}</div>
+                      <div style={{ fontSize: 11, color: 'var(--text-muted)' }}>8-second · Veo 3</div>
+                    </div>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                      <span style={{ fontSize: 10, fontWeight: 600, padding: '2px 8px', borderRadius: 20, background: 'rgba(239,68,68,0.1)', color: '#ef4444' }}>Simple Video</span>
+                      {vp.updated_at && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>{new Date(vp.updated_at).toLocaleDateString()}</span>}
                     </div>
                   </div>
                 ))}
@@ -1169,23 +1430,31 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                       </div>
                     </button>
 
-                    {/* Video — coming soon */}
-                    <div style={{
-                      display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
-                      padding: '18px 12px', borderRadius: 12,
-                      border: '1px solid var(--border)', background: 'var(--surface2)',
-                      textAlign: 'center', opacity: 0.55,
-                    }}>
-                      <div style={{ width: 40, height: 40, borderRadius: 11, background: 'var(--surface)', border: '1px solid var(--border)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="var(--text-muted)" strokeWidth="1.8">
+                    {/* Simple Video */}
+                    <button
+                      onClick={createVideoPipeline}
+                      disabled={creatingVideo}
+                      style={{
+                        display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 10,
+                        padding: '18px 12px', borderRadius: 12, cursor: creatingVideo ? 'default' : 'pointer',
+                        border: '1px solid var(--border)', background: 'var(--surface)',
+                        transition: 'all 0.12s', textAlign: 'center',
+                      }}
+                      onMouseEnter={e => { if (!creatingVideo) { e.currentTarget.style.borderColor = '#ef4444'; e.currentTarget.style.background = 'rgba(239,68,68,0.06)' } }}
+                      onMouseLeave={e => { e.currentTarget.style.borderColor = 'var(--border)'; e.currentTarget.style.background = 'var(--surface)' }}
+                    >
+                      <div style={{ width: 40, height: 40, borderRadius: 11, background: 'rgba(239,68,68,0.1)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="#ef4444" strokeWidth="1.8">
                           <polygon points="23 7 16 12 23 17 23 7"/><rect x="1" y="5" width="15" height="14" rx="2"/>
                         </svg>
                       </div>
                       <div>
-                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text-mid)', marginBottom: 3 }}>Video</div>
-                        <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--text-muted)', background: 'var(--surface)', border: '1px solid var(--border)', padding: '1px 7px', borderRadius: 20, display: 'inline-block' }}>Coming soon</div>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', marginBottom: 3 }}>
+                          {creatingVideo ? 'Creating…' : 'Simple Video'}
+                        </div>
+                        <div style={{ fontSize: 11, color: 'var(--text-muted)', lineHeight: 1.4 }}>8-second Veo 3 video</div>
                       </div>
-                    </div>
+                    </button>
 
                     {/* Node Workflow */}
                     <button
@@ -1275,6 +1544,14 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                     </svg>
                     Save All
                   </button>
+                  <button
+                    className="btn btn-secondary btn-sm"
+                    onClick={() => setDrivePost(selectedPost)}
+                    style={{ gap: 6, flexShrink: 0 }}
+                  >
+                    <DriveIcon size={14} />
+                    Save in Drive
+                  </button>
                 </div>
 
                 <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, 1fr)', gap: 10 }}>
@@ -1327,7 +1604,7 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
               </>
             ) : (
               <>
-                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20 }}>
+                <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 20, gap: 12, flexWrap: 'wrap' }}>
                   <div>
                     <div style={{ fontSize: 15, fontWeight: 700, letterSpacing: '-0.3px' }}>Posts</div>
                     <div style={{ fontSize: 12, color: 'var(--text-muted)', marginTop: 2, display: 'flex', gap: 10 }}>
@@ -1340,7 +1617,60 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                       )}
                     </div>
                   </div>
+                  <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', alignItems: 'center' }}>
+                    {/* Posted filter */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[['all','All'],['posted','Posted'],['not-posted','Not posted']].map(([val, label]) => (
+                        <button
+                          key={val}
+                          onClick={() => setPostedFilter(val)}
+                          style={{
+                            padding: '4px 10px', borderRadius: 20, border: '1px solid',
+                            fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                            background: postedFilter === val ? 'var(--accent)' : 'transparent',
+                            borderColor: postedFilter === val ? 'var(--accent)' : 'var(--border)',
+                            color: postedFilter === val ? 'white' : 'var(--text-muted)',
+                            transition: 'all 0.12s',
+                          }}
+                        >{label}</button>
+                      ))}
+                    </div>
+                    <div style={{ width: 1, height: 16, background: 'var(--border)' }} />
+                    {/* Date filter */}
+                    <div style={{ display: 'flex', gap: 4 }}>
+                      {[['all','All'],['7d','7d'],['30d','30d'],['3m','3m'],['1y','1y']].map(([val, label]) => (
+                        <button
+                          key={val}
+                          onClick={() => setDatePreset(val)}
+                          style={{
+                            padding: '4px 10px', borderRadius: 20, border: '1px solid',
+                            fontSize: 12, fontWeight: 500, cursor: 'pointer',
+                            background: datePreset === val ? 'var(--accent)' : 'transparent',
+                            borderColor: datePreset === val ? 'var(--accent)' : 'var(--border)',
+                            color: datePreset === val ? 'white' : 'var(--text-muted)',
+                            transition: 'all 0.12s',
+                          }}
+                        >{label}</button>
+                      ))}
+                    </div>
+                  </div>
                 </div>
+
+                {executions.filter(e => {
+                  const d = new Date(e.created_at), now = new Date()
+                  if (datePreset === '7d')  { if (d < new Date(now - 7  * 864e5))  return false }
+                  if (datePreset === '30d') { if (d < new Date(now - 30 * 864e5))  return false }
+                  if (datePreset === '3m')  { if (d < new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()))  return false }
+                  if (datePreset === '1y')  { if (d < new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())) return false }
+                  if (postedFilter === 'posted')     return  e.posted
+                  if (postedFilter === 'not-posted') return !e.posted
+                  return true
+                }).length === 0 && executions.length > 0 ? (
+                  <div className="empty-state" style={{ padding: '40px 20px' }}>
+                    <div className="empty-title" style={{ fontSize: 14 }}>No posts match this filter</div>
+                    <div className="empty-sub">Try a different range or status.</div>
+                  </div>
+                ) : null}
 
                 {executions.length === 0 ? (
                   <div className="empty-state" style={{ padding: '60px 20px' }}>
@@ -1352,7 +1682,16 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                   </div>
                 ) : (
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                    {executions.map(ex => {
+                    {executions.filter(e => {
+                      const d = new Date(e.created_at), now = new Date()
+                      if (datePreset === '7d')  { if (d < new Date(now - 7  * 864e5))  return false }
+                      if (datePreset === '30d') { if (d < new Date(now - 30 * 864e5))  return false }
+                      if (datePreset === '3m')  { if (d < new Date(now.getFullYear(), now.getMonth() - 3, now.getDate()))  return false }
+                      if (datePreset === '1y')  { if (d < new Date(now.getFullYear() - 1, now.getMonth(), now.getDate())) return false }
+                      if (postedFilter === 'posted')     return  e.posted
+                      if (postedFilter === 'not-posted') return !e.posted
+                      return true
+                    }).map(ex => {
                       const thumb = ex.images?.[0]?.src
                       return (
                         <div
@@ -1377,11 +1716,25 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
                             <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
                               <div style={{ flex: 1, minWidth: 0 }}>
                                 <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--text)', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.title}</div>
-                                {ex.topic
-                                  ? <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.topic}</div>
-                                  : <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 2 }}>{new Date(ex.created_at).toLocaleDateString()}</div>
-                                }
+                                {ex.topic && <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{ex.topic}</div>}
+                                <div style={{ fontSize: 11, color: 'var(--text-muted)', marginTop: 1 }}>{new Date(ex.created_at).toLocaleDateString()}</div>
                               </div>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                title="Save all images"
+                                style={{ padding: '4px 6px', color: 'var(--text-muted)', flexShrink: 0 }}
+                                onClick={e => { e.stopPropagation(); downloadAllImages((ex.images || []).map(img => ({ ...img, status: 'done' }))) }}
+                              >
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                              </button>
+                              <button
+                                className="btn btn-ghost btn-sm"
+                                title="Save in Drive"
+                                style={{ padding: '4px 6px', flexShrink: 0 }}
+                                onClick={e => { e.stopPropagation(); setDrivePost(ex) }}
+                              >
+                                <DriveIcon size={13} />
+                              </button>
                               <button
                                 className="btn btn-ghost btn-sm"
                                 style={{ padding: '4px 6px', color: 'var(--text-muted)', flexShrink: 0 }}
@@ -1419,6 +1772,14 @@ export default function InfluencerDetail({ id, onBack, onOpenPipeline, onOpenCar
 
       </div>
     </div>
+
+    {drivePost && (
+      <SaveToDriveModal
+        post={drivePost}
+        onClose={() => setDrivePost(null)}
+      />
+    )}
+    </>
   )
 }
 

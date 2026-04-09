@@ -9,6 +9,7 @@ import Settings from './pages/Settings'
 import InfluencerDetail from './pages/InfluencerDetail'
 import PipelineBuilder from './pages/PipelineBuilder'
 import CarouselPipeline from './pages/CarouselPipeline'
+import SimpleVideoPipeline from './pages/SimpleVideoPipeline'
 
 // ── Mobile nav ────────────────────────────────────────────────────────────────
 function MobileHeader({ page, setPage, count, onSignOut, title, onBack, backLabel }) {
@@ -103,6 +104,7 @@ const PAGE_TITLES = {
   analytics:          'Analytics',
   settings:           'Settings',
   'carousel-pipeline': 'Carousel Pipeline',
+  'video-pipeline':    'Simple Video Pipeline',
 }
 
 export default function App() {
@@ -112,6 +114,8 @@ export default function App() {
   const [pipelineCtx, setPipelineCtx] = useState(null)   // { influencerId, workflowId }
   const [carouselInfId, setCarouselInfId] = useState(null)
   const [carouselPipId, setCarouselPipId] = useState(null)
+  const [videoInfId, setVideoInfId]       = useState(null)
+  const [videoPipId, setVideoPipId]       = useState(null)
   const [influencerCount, setInfluencerCount] = useState(0)
 
   useEffect(() => {
@@ -147,6 +151,19 @@ export default function App() {
     else setPage('influencers')
   }
 
+  function openVideoPipeline(influencerId, pipelineId) {
+    setVideoInfId(influencerId)
+    setVideoPipId(pipelineId)
+    setPage('video-pipeline')
+  }
+  function closeVideoPipeline() {
+    const infId = videoInfId
+    setVideoInfId(null)
+    setVideoPipId(null)
+    if (infId) { setDetailId(infId); setPage('detail') }
+    else setPage('influencers')
+  }
+
   async function handleSignOut() { await supabase.auth.signOut() }
 
   if (session === undefined) {
@@ -160,10 +177,11 @@ export default function App() {
 
   const isPipelineBuilder  = page === 'pipeline-builder'
   const isCarouselPipeline = page === 'carousel-pipeline'
+  const isVideoPipeline    = page === 'video-pipeline'
   const title = page === 'detail' ? 'Influencer' : PAGE_TITLES[page] || ''
 
-  const mobileBackLabel = page === 'detail' ? 'Influencers' : isCarouselPipeline ? 'Back' : null
-  const mobileOnBack    = page === 'detail' ? closeDetail : isCarouselPipeline ? closeCarouselPipeline : null
+  const mobileBackLabel = page === 'detail' ? 'Influencers' : (isCarouselPipeline || isVideoPipeline) ? 'Back' : null
+  const mobileOnBack    = page === 'detail' ? closeDetail : isCarouselPipeline ? closeCarouselPipeline : isVideoPipeline ? closeVideoPipeline : null
 
   return (
     <div className="app-shell">
@@ -201,6 +219,12 @@ export default function App() {
                 Back
               </button>
             )}
+            {isVideoPipeline && (
+              <button className="btn btn-secondary btn-sm" onClick={closeVideoPipeline} style={{ gap:5, marginRight:8, flexShrink:0 }}>
+                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5"><polyline points="15 18 9 12 15 6"/></svg>
+                Back
+              </button>
+            )}
             <div className="topbar-title">{title}</div>
             <div style={{ display:'flex', alignItems:'center', gap:12 }}>
               <span style={{ fontSize:13, color:'var(--text-muted)' }}>{session.user.email}</span>
@@ -220,6 +244,7 @@ export default function App() {
               onBack={closeDetail}
               onOpenPipeline={(wfId) => openPipelineBuilder(detailId, wfId)}
               onOpenCarousel={(pipId) => openCarouselPipeline(detailId, pipId)}
+              onOpenVideo={(pipId) => openVideoPipeline(detailId, pipId)}
               onNewNodePipeline={() => openPipelineBuilder(detailId, null)}
             />
           )}
@@ -228,6 +253,13 @@ export default function App() {
               influencerId={carouselInfId}
               pipelineId={carouselPipId}
               onBack={closeCarouselPipeline}
+            />
+          )}
+          {page === 'video-pipeline' && videoInfId && videoPipId && (
+            <SimpleVideoPipeline
+              influencerId={videoInfId}
+              pipelineId={videoPipId}
+              onBack={closeVideoPipeline}
             />
           )}
           {page === 'pipeline-builder' && pipelineCtx && (
