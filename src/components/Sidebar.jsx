@@ -39,14 +39,7 @@ export default function Sidebar({ page, setPage, count }) {
     <aside className="sidebar">
       <div className="sidebar-logo">
         <div className="sidebar-logo-icon">
-          <svg viewBox="0 0 28 28" fill="none">
-            {/* Person silhouette */}
-            <circle cx="14" cy="10" r="4" fill="white"/>
-            <path d="M6 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-            {/* Signal arc */}
-            <path d="M20 7a7.5 7.5 0 0 1 0 6" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.6"/>
-            <path d="M22.5 4.5a11 11 0 0 1 0 11" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.35"/>
-          </svg>
+          <img src="/logopersona.png" alt="InfluenceOS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
         </div>
         <span className="sidebar-logo-name">Influence<span>OS</span></span>
       </div>

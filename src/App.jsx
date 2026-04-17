@@ -43,13 +43,7 @@ function MobileHeader({ page, setPage, count, onSignOut, title, onBack, backLabe
         </button>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <div style={{ width: 26, height: 26, borderRadius: 7, background: 'linear-gradient(145deg, #1a8fff, #0055c8)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg viewBox="0 0 28 28" fill="none" width="17" height="17">
-              <circle cx="14" cy="10" r="4" fill="white"/>
-              <path d="M6 22c0-4.418 3.582-8 8-8s8 3.582 8 8" stroke="white" strokeWidth="2" strokeLinecap="round"/>
-              <path d="M20 7a7.5 7.5 0 0 1 0 6" stroke="white" strokeWidth="1.8" strokeLinecap="round" opacity="0.6"/>
-            </svg>
-          </div>
+          <img src="/logopersona.png" alt="InfluenceOS" style={{ width: 26, height: 26, objectFit: 'contain' }} />
           <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.3px' }}>
             Influence<span style={{ color: 'var(--accent)', fontWeight: 500 }}>OS</span>
           </span>
