@@ -38,10 +38,7 @@ export default function Sidebar({ page, setPage, count }) {
   return (
     <aside className="sidebar">
       <div className="sidebar-logo">
-        <div className="sidebar-logo-icon">
-          <img src="/logopersona.png" alt="InfluenceOS" style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
-        </div>
-        <span className="sidebar-logo-name">Influence<span>OS</span></span>
+        <img src="/logopersona.png" alt="InfluenceOS" style={{ height: 36, objectFit: 'contain' }} />
       </div>
 
       <div className="nav-label" style={{ marginTop: 4 }}>Main</div>
