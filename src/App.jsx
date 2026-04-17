@@ -43,7 +43,7 @@ function MobileHeader({ page, setPage, count, onSignOut, title, onBack, backLabe
         </button>
       ) : (
         <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexShrink: 0 }}>
-          <img src="/logopersona.png" alt="InfluenceOS" style={{ width: 26, height: 26, objectFit: 'contain' }} />
+          <img src="/logopersona.png" alt="InfluenceOS" style={{ width: 40, height: 40, objectFit: 'contain' }} />
           <span style={{ fontSize: 14, fontWeight: 700, letterSpacing: '-0.3px' }}>
             Influence<span style={{ color: 'var(--accent)', fontWeight: 500 }}>OS</span>
           </span>
