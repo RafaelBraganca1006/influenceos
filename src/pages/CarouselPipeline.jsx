@@ -821,7 +821,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const [promptsResult, setPromptsResult] = useState(null)
   const [visibleSlides, setVisibleSlides] = useState(0)
   const [p2Error, setP2Error]         = useState('')
-  const [p2Prompt, setP2Prompt]       = useState(null)
+  const [p2Prompt, setP2Prompt]       = useState(pip.p2Prompt || null)
   const [p2PromptOpen, setP2PromptOpen] = useState(false)
 
   // Phase 3 — always fresh
@@ -847,6 +847,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const timerRef    = useRef(null)
   const cancelRef   = useRef(false)
   const execKeyRef  = useRef(null)   // folder key for current execution's Storage files
+  const pipRef      = useRef(pip)    // always holds the latest merged pip, avoids stale closure in save()
 
   function startTimer() {
     setElapsed(0); setTimerActive(true)
@@ -864,9 +865,12 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
   const p4PromptDefault = buildCaptionPrompt(inf, idea || { topic: '' }, hashtagCount)
   const p4PromptDisplay = p4Prompt || p4PromptDefault
 
-  // Auto-save helper
+  // Auto-save helper — uses pipRef so sequential saves within async workflows
+  // always build on the latest merged state, not the stale prop closure.
   function save(patch) {
-    onUpdate({ ...pip, ...patch, updatedAt: new Date().toISOString() })
+    const updated = { ...pipRef.current, ...patch, updatedAt: new Date().toISOString() }
+    pipRef.current = updated
+    onUpdate(updated)
   }
 
   // Manual save-all — flushes every current setting to DB immediately
@@ -1114,6 +1118,9 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     setIdea(next)
     save({ idea: next })
   }
+
+  // Keep pipRef current whenever the prop changes (e.g. parent re-loads from DB).
+  useEffect(() => { pipRef.current = pip }, [pip])
 
   useEffect(() => () => {
     if (staggerRef.current) clearInterval(staggerRef.current)
@@ -1879,7 +1886,8 @@ export default function CarouselPipeline({ influencerId, pipelineId, onBack, onD
     setPip(updated)
     if (saveTimerRef.current) clearTimeout(saveTimerRef.current)
     saveTimerRef.current = setTimeout(async () => {
-      await supabase.from('carousel_pipelines').update(toDbPip(updated)).eq('id', updated.id)
+      const { error } = await supabase.from('carousel_pipelines').update(toDbPip(updated)).eq('id', updated.id)
+      if (error) console.error('[CarouselPipeline] save failed:', error.message, error)
     }, 800)
   }
 
