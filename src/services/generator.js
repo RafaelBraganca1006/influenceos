@@ -22,31 +22,6 @@ export function buildPersonaContext(inf) {
     .join('\n')
 }
 
-// ── Retry helper for 429 / 503 transient errors ──────────────────────────────
-async function fetchWithRetry(url, options, maxRetries = 3) {
-  let lastError
-  for (let attempt = 0; attempt <= maxRetries; attempt++) {
-    const res  = await fetch(url, options)
-    const data = await res.json()
-    if (res.ok) return { res, data }
-    const status  = res.status
-    const message = data.error?.message || `HTTP ${status}`
-    // Retry on rate-limit (429) or transient server errors (500/503)
-    if ((status === 429 || status >= 500) && attempt < maxRetries) {
-      const backoff = Math.min(4000 * 2 ** attempt, 30000) // 4s → 8s → 16s → 30s cap
-      await new Promise(r => setTimeout(r, backoff))
-      lastError = message
-      continue
-    }
-    throw new Error(
-      status === 429
-        ? `Gemini rate limit hit. ${message} — check your quota at aistudio.google.com or wait a minute and try again.`
-        : message
-    )
-  }
-  throw new Error(`Gemini rate limit hit after ${maxRetries} retries. ${lastError}`)
-}
-
 // ── Base Gemini text call ─────────────────────────────────────────────────────
 export async function geminiText(apiKey, { system, user, model = 'gemini-2.0-flash' }) {
   if (!apiKey || apiKey.length < 10 || !apiKey.startsWith('AIza')) {
@@ -57,11 +32,13 @@ export async function geminiText(apiKey, { system, user, model = 'gemini-2.0-fla
   if (system?.trim()) {
     body.systemInstruction = { parts: [{ text: system }] }
   }
-  const { data } = await fetchWithRetry(url, {
+  const res  = await fetch(url, {
     method:  'POST',
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || 'Gemini API error')
   return data.candidates[0].content.parts[0].text
 }
 
@@ -128,11 +105,9 @@ export async function generateSlideImage(apiKey, prompt, refImages = [], aspectR
     },
   }
 
-  const { data } = await fetchWithRetry(url, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(body),
-  })
+  const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  const data = await res.json()
+  if (!res.ok) throw new Error(data.error?.message || 'Gemini image error')
 
   const imgPart = data.candidates[0].content.parts.find(p => p.inlineData)
   if (!imgPart) throw new Error('No image returned from Gemini.')
