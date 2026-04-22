@@ -961,8 +961,7 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
     execKeyRef.current = execKey
     const storageFolder = `${user.id}/${pip.id}/${execKey}`
 
-    for (let i = 0; i < slides.length; i++) {
-      const slide = slides[i]
+    for (const slide of slides) {
       if (cancelRef.current) {
         for (let j = final.findIndex(img => img.position === slide.position); j < final.length; j++) {
           final[j] = { ...final[j], status: 'idle' }
@@ -970,9 +969,6 @@ function EditorView({ pip, inf, geminiKey, onUpdate, onBack }) {
         setSlideImages([...final])
         break
       }
-      // Space image requests ~15s apart to stay within preview-model RPM limits
-      if (i > 0) await new Promise(r => setTimeout(r, 15000))
-      if (cancelRef.current) break
       const idx = final.findIndex(img => img.position === slide.position)
       try {
         const base64 = await generateSlideImage(geminiKey, slide.prompt, refImages, aspectRatio, imageModel)

@@ -1,3 +1,5 @@
+import { textLimiter, imageLimiter } from './rateLimiter.js'
+
 // ── JSON extraction (handles ```json...``` wrapping from LLM) ─────────────────
 function extractJSON(text) {
   const block = text.match(/```(?:json)?\s*([\s\S]*?)\s*```/)
@@ -27,6 +29,7 @@ export async function geminiText(apiKey, { system, user, model = 'gemini-2.0-fla
   if (!apiKey || apiKey.length < 10 || !apiKey.startsWith('AIza')) {
     throw new Error('Invalid Gemini API key. Go to Settings and enter your key from aistudio.google.com (starts with AIza…).')
   }
+  await textLimiter.acquire()
   const url  = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`
   const body = { contents: [{ parts: [{ text: user }] }] }
   if (system?.trim()) {
@@ -37,6 +40,7 @@ export async function geminiText(apiKey, { system, user, model = 'gemini-2.0-fla
     headers: { 'Content-Type': 'application/json' },
     body:    JSON.stringify(body),
   })
+  textLimiter.readHeaders(res)
   const data = await res.json()
   if (!res.ok) throw new Error(data.error?.message || 'Gemini API error')
   return data.candidates[0].content.parts[0].text
@@ -105,7 +109,9 @@ export async function generateSlideImage(apiKey, prompt, refImages = [], aspectR
     },
   }
 
+  await imageLimiter.acquire()
   const res  = await fetch(url, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) })
+  imageLimiter.readHeaders(res)
   const data = await res.json()
   if (!res.ok) throw new Error(data.error?.message || 'Gemini image error')
 
